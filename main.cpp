@@ -1,6 +1,7 @@
 #include <pipewire/pipewire.h>
 #include "PipeWireStream.hpp"
 #include "xdg-desktop-portal.h"
+#include "FFmpegOutput.hpp"
 #include <cstdio>
 #include <unistd.h>
 
@@ -26,7 +27,23 @@ int main(int argc, char** argv)
 		pw_init(&argc, &argv);
 
 		{
-			auto pwStream = pw::PipeWireStream(shareInfo.value());
+			std::unique_ptr<ffmpeg::FFmpegOutput> ffmpegOutput;
+			auto streamConnectedCb = [&ffmpegOutput] (Rect dimensions, PixelFormat format, bool isDmaBuf)
+			{
+				ffmpegOutput = std::make_unique<ffmpeg::FFmpegOutput>(dimensions, format, isDmaBuf);
+			};
+			auto pushMemoryFrameCb = [&ffmpegOutput](const MemoryFrame& frame, FrameDoneCallback cb)
+			{
+				ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(frame, std::move(cb))));
+			};
+			auto pushDmaBufFrameCb = [&ffmpegOutput](const DmaBufFrame& frame, FrameDoneCallback cb)
+			{
+				ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(frame, std::move(cb))));
+			};
+			auto pwStream = pw::PipeWireStream(shareInfo.value(),
+											   std::move(streamConnectedCb),
+											   std::move(pushMemoryFrameCb),
+											   std::move(pushDmaBufFrameCb));
 			pwStream.runStreamLoop();
 		}
 

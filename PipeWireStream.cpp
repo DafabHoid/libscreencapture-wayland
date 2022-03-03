@@ -16,6 +16,8 @@
 #include <libdrm/drm_fourcc.h>
 #include <signal.h> // sigaction
 
+namespace pw
+{
 
 static volatile bool globalStopFlag = false;
 
@@ -118,7 +120,7 @@ void processFrame(void* userData) noexcept
 					.size = d.chunk->size,
 					.offset = d.chunk->offset
 			};
-			pushFrame(frame, [si, b]() {
+			si->mainLoopInfo->pushMemoryFrame(frame, [si, b]() {
 				pw_stream_queue_buffer(si->stream, b);
 			});
 		} else if (d.type == SPA_DATA_DmaBuf) {
@@ -148,7 +150,7 @@ void processFrame(void* userData) noexcept
 				plane.offset = chunk.offset;
 				plane.pitch = chunk.stride;
 			}
-			pushFrame(frame, [si, b]() {
+			si->mainLoopInfo->pushDmaBufFrame(frame, [si, b]() {
 				pw_stream_queue_buffer(si->stream, b);
 			});
 		}
@@ -170,7 +172,7 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 		auto& raw = si->format.info.raw;
 		try
 		{
-			initLAV(raw.size.width, raw.size.height, spa2pixelFormat(raw.format), si->haveDmaBuf);
+			si->mainLoopInfo->streamConnected(Rect {raw.size.width, raw.size.height}, spa2pixelFormat(raw.format), si->haveDmaBuf);
 		}
 		catch (const std::exception& e)
 		{
@@ -179,7 +181,6 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 	}
 	else if (old == PW_STREAM_STATE_STREAMING)
 	{
-		deinitLibAV();
 		si->mainLoopInfo->quit();
 	}
 }
@@ -188,7 +189,7 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 	(sizeof(struct spa_meta_cursor) + sizeof(struct spa_meta_bitmap) + \
 	 width * height * 4)
 
-void streamParamChanged(void* userdata, uint32_t paramID, const spa_pod* param) noexcept
+static void streamParamChanged(void* userdata, uint32_t paramID, const spa_pod* param) noexcept
 {
 	if (!param || paramID != SPA_PARAM_Format)
 		return;
@@ -239,12 +240,12 @@ static const pw_stream_events streamEvents = {
 		.process = processFrame,
 };
 
-void coreInfo(void* userData, const pw_core_info* info) noexcept
+static void coreInfo(void* userData, const pw_core_info* info) noexcept
 {
 	printf("PipeWire Info: version %s, connection name: %s, user %s on %s\n", info->version, info->name, info->user_name, info->host_name);
 }
 
-void coreError(void* userData, uint32_t id, int seq, int res, const char* msg) noexcept
+static void coreError(void* userData, uint32_t id, int seq, int res, const char* msg) noexcept
 {
 	auto si = static_cast<pw::StreamInfo*>(userData);
 	printf("PipeWire error, id = %u, seq = %d, res = %d (%s): %s\n", id, seq, res, strerror(res), msg);
@@ -294,11 +295,17 @@ static const spa_pod* buildStreamParams(spa_pod_builder& b, bool withDMABuf)
 	return static_cast<const spa_pod*>(spa_pod_builder_pop(&b, &f));
 }
 
-pw::PipeWireStream::PipeWireStream(const SharedScreen& shareInfo)
+PipeWireStream::PipeWireStream(const SharedScreen& shareInfo,
+                                   StreamConnectedCallback streamConnected,
+                                   PushMemoryFrameCallback pushMemoryFrameCb,
+                                   PushDmaBufFrameCallback pushDmaBufFrameCb)
 : mainLoop{pw_main_loop_new(nullptr)},
   ctx{pw_context_new(pw_main_loop_get_loop(mainLoop), nullptr, 0)},
   core{},
-  streamInfo{}
+  streamInfo{},
+  streamConnected{std::move(streamConnected)},
+  pushMemoryFrame{std::move(pushMemoryFrameCb)},
+  pushDmaBufFrame{std::move(pushDmaBufFrameCb)}
 {
 #ifndef NDEBUG
 	pw_log_set_level(spa_log_level::SPA_LOG_LEVEL_DEBUG);
@@ -351,7 +358,7 @@ pw::PipeWireStream::PipeWireStream(const SharedScreen& shareInfo)
 	sigaction(SIGTERM, &sigIntHandler, nullptr);
 }
 
-pw::PipeWireStream::~PipeWireStream() noexcept
+PipeWireStream::~PipeWireStream() noexcept
 {
 	if (streamInfo.stream)
 	{
@@ -365,20 +372,22 @@ pw::PipeWireStream::~PipeWireStream() noexcept
 	if (mainLoop) pw_main_loop_destroy(mainLoop);
 }
 
-void pw::PipeWireStream::quit() noexcept
+void PipeWireStream::quit() noexcept
 {
 	pw_main_loop_quit(mainLoop);
 }
 
-void pw::PipeWireStream::setError(std::exception_ptr ep) noexcept
+void PipeWireStream::setError(std::exception_ptr ep) noexcept
 {
 	streamException = std::move(ep);
 }
 
-void pw::PipeWireStream::runStreamLoop()
+void PipeWireStream::runStreamLoop()
 {
 	pw_main_loop_run(mainLoop);
 	// if an exception occurred during the main loop, pass it on
 	if (streamException)
 		std::rethrow_exception(std::move(streamException));
+}
+
 }

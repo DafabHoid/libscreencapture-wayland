@@ -73,10 +73,6 @@ struct MemoryFrame
 using FrameDoneCallback = std::function<void()>;
 
 
-extern void initLAV(int sourceWidth, int sourceHeight, PixelFormat sourcePixelFormat, bool withDRMPrime);
-extern void deinitLibAV() noexcept;
-extern void pushFrame(DmaBufFrame frame, FrameDoneCallback cb);
-extern void pushFrame(MemoryFrame frame, FrameDoneCallback cb);
 
 extern void dumpStackTrace(const char* filename = "trace.txt") noexcept;
 

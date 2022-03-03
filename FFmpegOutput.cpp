@@ -159,25 +159,3 @@ FFmpegOutput::~FFmpegOutput() noexcept
 }
 
 }
-
-std::unique_ptr<ffmpeg::FFmpegOutput> libAV;
-
-void initLAV(int sourceWidth, int sourceHeight, PixelFormat sourcePixelFormat, bool withDRMPrime)
-{
-	libAV = std::make_unique<ffmpeg::FFmpegOutput>(Rect {static_cast<unsigned int>(sourceWidth), static_cast<unsigned int>(sourceHeight)}, sourcePixelFormat, withDRMPrime);
-}
-
-void deinitLibAV() noexcept
-{
-	libAV.reset();
-}
-
-void pushFrame(MemoryFrame frame, FrameDoneCallback cb)
-{
-	libAV->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(frame, std::move(cb))));
-}
-
-void pushFrame(DmaBufFrame frame, FrameDoneCallback cb)
-{
-	libAV->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(frame, std::move(cb))));
-}
