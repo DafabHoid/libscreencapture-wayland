@@ -19,6 +19,9 @@ extern "C"
 
 using namespace std::chrono_literals;
 
+namespace ffmpeg
+{
+
 VAAPIScaler::VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targetSize,
                          AVBufferRef* drmDevice, AVBufferRef* vaapiDevice, bool inputIsDRMPrime, ScalingDoneCallback cb)
 : filterGraph(avfilter_graph_alloc()),
@@ -199,4 +202,6 @@ void VAAPIScaler::scaleFramesLoop()
 	{
 		scaleThreadException = std::current_exception();
 	}
+}
+
 }

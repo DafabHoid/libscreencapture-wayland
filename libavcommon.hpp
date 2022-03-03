@@ -14,6 +14,9 @@ extern "C" {
 #include <libavutil/frame.h>
 }
 
+namespace ffmpeg
+{
+
 class LibAVException : public std::exception
 {
 	char message[128];
@@ -48,5 +51,7 @@ struct AVFrameFree
 	}
 };
 using AVFrame_Heap = std::unique_ptr<AVFrame, AVFrameFree>;
+
+}
 
 #endif //SCREENCAPTURE_LIBAVCOMMON_HPP

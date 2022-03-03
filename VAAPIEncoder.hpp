@@ -15,6 +15,9 @@ extern "C"
 #include <libavcodec/avcodec.h>
 }
 
+namespace ffmpeg
+{
+
 using EncodedCallback = std::function<void(AVPacket&)>;
 
 class VAAPIEncoder
@@ -41,6 +44,8 @@ public:
 	const AVCodec* getCodec() const noexcept { return codec; }
 	const AVCodecContext* getCodecContext() const noexcept { return codecContext; }
 };
+
+}
 
 
 #endif //SCREENCAPTURE_VAAPIENCODER_HPP

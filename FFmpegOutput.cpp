@@ -3,11 +3,7 @@
 
    SPDX-License-Identifier: GPL-3.0-or-later
 *******************************************************************************/
-#include "common.hpp"
-#include "libavcommon.hpp"
-#include "VAAPIEncoder.hpp"
-#include "VAAPIScaler.hpp"
-#include "Muxer.hpp"
+#include "FFmpegOutput.hpp"
 #include <cstdio>
 #include <cstdarg>
 #include <chrono>
@@ -21,18 +17,8 @@ extern "C" {
 #include <libavutil/hwcontext_drm.h>
 }
 
-struct LibAVContext
+namespace ffmpeg
 {
-	int width;
-	int height;
-	PixelFormat format;
-	AVBufferRef* drmDevice;
-	AVBufferRef* vaapiDevice;
-	time_point<steady_clock> startTime;
-	std::unique_ptr<VAAPIEncoder> encoder;
-	std::unique_ptr<VAAPIScaler> scaler;
-	std::unique_ptr<Muxer> muxer;
-} libAV;
 
 LibAVException::LibAVException(int errorCode, const char* messageFmtStr, ...)
 {
@@ -40,7 +26,7 @@ LibAVException::LibAVException(int errorCode, const char* messageFmtStr, ...)
 	va_start(v_args, messageFmtStr);
 	char averrstr[AV_ERROR_MAX_STRING_SIZE];
 	int n = std::snprintf(message, sizeof(message), "LibAV error %d (%s): ",
-						  errorCode, av_make_error_string(averrstr, sizeof(averrstr), errorCode));
+	                      errorCode, av_make_error_string(averrstr, sizeof(averrstr), errorCode));
 	if (n > 0 && n < sizeof(message))
 		std::vsnprintf(message + n, sizeof(message) - n, messageFmtStr, v_args);
 	va_end(v_args);
@@ -48,23 +34,23 @@ LibAVException::LibAVException(int errorCode, const char* messageFmtStr, ...)
 	dumpStackTrace();
 }
 
-static void pushFrame(AVFrame_Heap frame)
+void FFmpegOutput::pushFrame(AVFrame_Heap frame)
 {
 	// assign a monotonically increasing PTS timestamp
 	// the timebase we use is microseconds, and PTS = 0 means the start of the stream
 	auto now = steady_clock::now();
-	auto fromStart = now - libAV.startTime;
+	auto fromStart = now - startTime;
 	frame->pts = duration_cast<microseconds>(fromStart).count();
 
-	libAV.scaler->enqueueFrame(std::move(frame));
+	scaler->enqueueFrame(std::move(frame));
 }
 
 AVFrame* wrapInAVFrame(const MemoryFrame& frame, FrameDoneCallback cb) noexcept
 {
 	auto f = av_frame_alloc();
-	f->width = libAV.width;
-	f->height = libAV.height;
-	f->format = pixelFormat2AV(libAV.format);
+	f->width = frame.width;
+	f->height = frame.height;
+	f->format = pixelFormat2AV(frame.format);
 	f->data[0] = static_cast<uint8_t*>(frame.memory) + frame.offset;
 	f->linesize[0] = frame.stride;
 
@@ -121,22 +107,13 @@ AVFrame* wrapInAVFrame(const DmaBufFrame& frame, FrameDoneCallback cb) noexcept
 	return f;
 }
 
-void pushFrame(MemoryFrame frame, FrameDoneCallback cb)
+FFmpegOutput::FFmpegOutput(Rect sourceDimensions, PixelFormat sourcePixelFormat, bool withDRMPrime)
+: width{sourceDimensions.w},
+  height{sourceDimensions.h},
+  format{sourcePixelFormat},
+  drmDevice{},
+  vaapiDevice{}
 {
-	pushFrame(AVFrame_Heap(wrapInAVFrame(frame, std::move(cb))));
-}
-
-void pushFrame(DmaBufFrame frame, FrameDoneCallback cb)
-{
-	pushFrame(AVFrame_Heap(wrapInAVFrame(frame, std::move(cb))));
-}
-
-void initLAV(int sourceWidth, int sourceHeight, PixelFormat sourcePixelFormat, bool withDRMPrime)
-{
-	libAV.width = sourceWidth;
-	libAV.height = sourceHeight;
-	libAV.format = sourcePixelFormat;
-
 #ifndef NDEBUG
 	av_log_set_level(AV_LOG_VERBOSE);
 #endif
@@ -146,39 +123,61 @@ void initLAV(int sourceWidth, int sourceHeight, PixelFormat sourcePixelFormat, b
 	avcodec_register_all();
 #endif
 
-	r = av_hwdevice_ctx_create(&libAV.drmDevice, AV_HWDEVICE_TYPE_DRM, "/dev/dri/renderD129", nullptr, 0);
+	r = av_hwdevice_ctx_create(&drmDevice, AV_HWDEVICE_TYPE_DRM, "/dev/dri/renderD129", nullptr, 0);
 	if (r)
 		throw LibAVException(r, "Opening the DRM node failed");
 
-	r = av_hwdevice_ctx_create_derived(&libAV.vaapiDevice, AV_HWDEVICE_TYPE_VAAPI, libAV.drmDevice, 0);
+	r = av_hwdevice_ctx_create_derived(&vaapiDevice, AV_HWDEVICE_TYPE_VAAPI, drmDevice, 0);
 	if (r < 0)
 		throw LibAVException(r, "Creating a VAAPI device from DRM node failed");
 
 
 	constexpr unsigned int targetWidth = 1920, targetHeight = 1080;
-	libAV.encoder = std::make_unique<VAAPIEncoder>(targetWidth, targetHeight, libAV.vaapiDevice, [](AVPacket& p)
+	encoder = std::make_unique<VAAPIEncoder>(targetWidth, targetHeight, vaapiDevice, [this](AVPacket& p)
 	{
-		libAV.muxer->writePacket(p);
+		muxer->writePacket(p);
 	});
 
-	libAV.muxer = std::make_unique<Muxer>("rtsp://[::1]:8654/screen", "rtsp", libAV.encoder->getCodecContext());
+	muxer = std::make_unique<Muxer>("rtsp://[::1]:8654/screen", "rtsp", encoder->getCodecContext());
 
-	libAV.scaler = std::make_unique<VAAPIScaler>(Rect {static_cast<unsigned int>(sourceWidth), static_cast<unsigned int>(sourceHeight)},
-	        pixelFormat2AV(libAV.format), Rect {targetWidth, targetHeight},
-	        libAV.drmDevice, libAV.vaapiDevice, withDRMPrime,
-	        [] (AVFrame_Heap f)
+	scaler = std::make_unique<VAAPIScaler>(Rect {width, height},
+	        pixelFormat2AV(format), Rect {targetWidth, targetHeight},
+	        drmDevice, vaapiDevice, withDRMPrime,
+	        [this] (AVFrame_Heap f)
 	        {
-	            libAV.encoder->enqueueFrame(std::move(f));
+	            encoder->enqueueFrame(std::move(f));
 	        });
 
-	libAV.startTime = steady_clock::now();
+	startTime = steady_clock::now();
+}
+
+FFmpegOutput::~FFmpegOutput() noexcept
+{
+	av_buffer_unref(&vaapiDevice);
+	av_buffer_unref(&drmDevice);
+	// scaler, encoder and muxer are implicitly stopped and destroyed here
+}
+
+}
+
+std::unique_ptr<ffmpeg::FFmpegOutput> libAV;
+
+void initLAV(int sourceWidth, int sourceHeight, PixelFormat sourcePixelFormat, bool withDRMPrime)
+{
+	libAV = std::make_unique<ffmpeg::FFmpegOutput>(Rect {static_cast<unsigned int>(sourceWidth), static_cast<unsigned int>(sourceHeight)}, sourcePixelFormat, withDRMPrime);
 }
 
 void deinitLibAV() noexcept
 {
-	libAV.scaler.reset();
-	libAV.encoder.reset();
-	libAV.muxer.reset();
-	av_buffer_unref(&libAV.vaapiDevice);
-	av_buffer_unref(&libAV.drmDevice);
+	libAV.reset();
+}
+
+void pushFrame(MemoryFrame frame, FrameDoneCallback cb)
+{
+	libAV->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(frame, std::move(cb))));
+}
+
+void pushFrame(DmaBufFrame frame, FrameDoneCallback cb)
+{
+	libAV->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(frame, std::move(cb))));
 }

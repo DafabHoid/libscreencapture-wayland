@@ -16,6 +16,9 @@ extern "C"
 #include <libavfilter/avfilter.h>
 }
 
+namespace ffmpeg
+{
+
 using ScalingDoneCallback = std::function<void(AVFrame_Heap)>;
 
 /** Upload and scale frames on the GPU using VAAPI.
@@ -66,6 +69,8 @@ public:
 	 * This function is NOT thread-safe. */
 	void scaleFrame(AVFrame& frame);
 };
+
+}
 
 
 #endif //SCREENCAPTURE_VAAPISCALER_HPP

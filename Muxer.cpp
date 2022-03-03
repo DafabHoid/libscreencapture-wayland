@@ -10,6 +10,9 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 }
 
+namespace ffmpeg
+{
+
 Muxer::Muxer(const std::string& outputURL, const std::string& containerFormat, const AVCodecContext* videoCodecCtx)
 : outputVideoStream{},
   codecTimeBase(videoCodecCtx->time_base)
@@ -67,4 +70,6 @@ void Muxer::writePacket(AVPacket& p)
 	int err = av_interleaved_write_frame(formatContext, &p);
 	if (err < 0)
 		throw LibAVException(err, "Writing packet failed");
+}
+
 }

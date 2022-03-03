@@ -31,7 +31,7 @@ void quit(pw::StreamInfo* si, std::exception_ptr ep)
 	pw_stream_flush(si->stream, false);
 }
 
-static uint32_t pipeWireFormat2DRM(spa_video_format format)
+static uint32_t spa2drmFormat(spa_video_format format)
 {
 	switch (format) {
 	case SPA_VIDEO_FORMAT_BGRA:
@@ -44,6 +44,23 @@ static uint32_t pipeWireFormat2DRM(spa_video_format format)
 		return DRM_FORMAT_XBGR8888;
 	default:
 		throw std::runtime_error("invalid format");
+	}
+}
+
+static constexpr inline PixelFormat spa2pixelFormat(spa_video_format format)
+{
+	switch (format)
+	{
+		case SPA_VIDEO_FORMAT_RGBA:
+			return PixelFormat::RGBA;
+		case SPA_VIDEO_FORMAT_RGBx:
+			return PixelFormat::RGBX;
+		case SPA_VIDEO_FORMAT_BGRA:
+			return PixelFormat::BGRA;
+		case SPA_VIDEO_FORMAT_BGRx:
+			return PixelFormat::BGRX;
+		default:
+			throw std::runtime_error("unsupported spa video format");
 	}
 }
 
@@ -93,6 +110,9 @@ void processFrame(void* userData) noexcept
 			       d.chunk->size, d.chunk->stride, d.data);
 			assert(b->buffer->n_datas == 1);
 			MemoryFrame frame{
+					.width = si->format.info.raw.size.width,
+					.height = si->format.info.raw.size.height,
+					.format = spa2pixelFormat(si->format.info.raw.format),
 					.memory = d.data,
 					.stride = static_cast<size_t>(d.chunk->stride),
 					.size = d.chunk->size,
@@ -114,7 +134,7 @@ void processFrame(void* userData) noexcept
 			DmaBufFrame frame{
 					.width = si->format.info.raw.size.width,
 					.height = si->format.info.raw.size.height,
-					.drmFormat = pipeWireFormat2DRM(si->format.info.raw.format),
+					.drmFormat = spa2drmFormat(si->format.info.raw.format),
 					.drmObject = {
 							.fd = static_cast<int>(b->buffer->datas[0].fd),
 							.totalSize = totalSize,
@@ -138,23 +158,6 @@ void processFrame(void* userData) noexcept
 		// exceptions must not travel outside this function, because it is called by C code
 		// → catch them here instead
 		quit(si, std::current_exception());
-	}
-}
-
-static constexpr inline PixelFormat spa2pixelFormat(spa_video_format format)
-{
-	switch (format)
-	{
-	case SPA_VIDEO_FORMAT_RGBA:
-		return PixelFormat::RGBA;
-	case SPA_VIDEO_FORMAT_RGBx:
-		return PixelFormat::RGBX;
-	case SPA_VIDEO_FORMAT_BGRA:
-		return PixelFormat::BGRA;
-	case SPA_VIDEO_FORMAT_BGRx:
-		return PixelFormat::BGRX;
-	default:
-		throw std::runtime_error("unsupported spa video format");
 	}
 }
 

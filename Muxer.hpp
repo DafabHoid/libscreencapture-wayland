@@ -11,6 +11,9 @@ extern "C" {
 #include <libavformat/avformat.h>
 }
 
+namespace ffmpeg
+{
+
 class Muxer
 {
 	AVStream* outputVideoStream;
@@ -23,6 +26,8 @@ public:
 
 	void writePacket(AVPacket& p);
 };
+
+}
 
 
 #endif //SCREENCAPTURE_MUXER_HPP

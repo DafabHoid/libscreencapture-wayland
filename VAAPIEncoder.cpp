@@ -9,6 +9,9 @@
 
 using namespace std::chrono_literals;
 
+namespace ffmpeg
+{
+
 VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVBufferRef* hwDevice, EncodedCallback cb)
 : encodedFrame(av_packet_alloc()),
   encodedCallback(std::move(cb))
@@ -109,4 +112,6 @@ void VAAPIEncoder::encodeFramesLoop()
 	{
 		encodingThreadException = std::current_exception();
 	}
+}
+
 }

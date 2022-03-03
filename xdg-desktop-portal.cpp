@@ -229,7 +229,7 @@ std::pair<int,uint32_t> getPipeWireShareInfo(sdbus::IConnection& connection, Cur
 	return {fd.release(), {pipeWireNode}};
 }
 
-std::optional<SharedScreen> portal::requestPipeWireShare(CursorMode cursorMode)
+std::optional<SharedScreen> requestPipeWireShare(CursorMode cursorMode)
 {
 	std::unique_ptr<sdbus::IConnection> connection = sdbus::createSessionBusConnection();
 	connection->enterEventLoopAsync();

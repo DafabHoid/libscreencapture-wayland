@@ -36,6 +36,14 @@ struct Rect
 	unsigned int h;
 };
 
+enum class PixelFormat
+{
+	BGRA,
+	RGBA,
+	BGRX,
+	RGBX,
+};
+
 struct DmaBufFrame
 {
 	uint32_t width;
@@ -54,6 +62,9 @@ struct DmaBufFrame
 };
 struct MemoryFrame
 {
+	uint32_t width;
+	uint32_t height;
+	PixelFormat format;
 	void* memory;
 	size_t stride;
 	size_t size;
@@ -61,14 +72,6 @@ struct MemoryFrame
 };
 using FrameDoneCallback = std::function<void()>;
 
-
-enum class PixelFormat
-{
-	BGRA,
-	RGBA,
-	BGRX,
-	RGBX,
-};
 
 extern void initLAV(int sourceWidth, int sourceHeight, PixelFormat sourcePixelFormat, bool withDRMPrime);
 extern void deinitLibAV() noexcept;

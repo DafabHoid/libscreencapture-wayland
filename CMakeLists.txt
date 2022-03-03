@@ -51,7 +51,7 @@ else()
 endif()
 
 # main binary
-add_executable(screencapture main.cpp xdg-desktop-portal.cpp common.hpp PipeWireStream.cpp libavoutput.cpp VAAPIEncoder.cpp VAAPIEncoder.hpp VAAPIScaler.cpp VAAPIScaler.hpp Muxer.cpp Muxer.hpp libavcommon.hpp BlockingRingbuffer.hpp PipeWireStream.hpp xdg-desktop-portal.h)
+add_executable(screencapture main.cpp xdg-desktop-portal.cpp common.hpp PipeWireStream.cpp FFmpegOutput.cpp VAAPIEncoder.cpp VAAPIEncoder.hpp VAAPIScaler.cpp VAAPIScaler.hpp Muxer.cpp Muxer.hpp libavcommon.hpp BlockingRingbuffer.hpp PipeWireStream.hpp xdg-desktop-portal.h FFmpegOutput.hpp)
 if(${BUILD_FFMPEG})
     add_dependencies(screencapture ffmpeg)
 endif()
