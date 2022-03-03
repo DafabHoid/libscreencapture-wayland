@@ -44,6 +44,8 @@ enum class PixelFormat
 	RGBX,
 };
 
+using FrameDoneCallback = std::function<void()>;
+
 struct DmaBufFrame
 {
 	uint32_t width;
@@ -59,6 +61,17 @@ struct DmaBufFrame
 		size_t offset;
 		size_t pitch;
 	} planes[4];
+
+	FrameDoneCallback onFrameDone;
+
+	DmaBufFrame() = default;
+	DmaBufFrame(const DmaBufFrame&) = delete;
+	DmaBufFrame(DmaBufFrame&&) = default;
+
+	~DmaBufFrame() noexcept
+	{
+		onFrameDone();
+	}
 };
 struct MemoryFrame
 {
@@ -69,8 +82,18 @@ struct MemoryFrame
 	size_t stride;
 	size_t size;
 	size_t offset;
+
+	FrameDoneCallback onFrameDone;
+
+	MemoryFrame() = default;
+	MemoryFrame(const MemoryFrame&) = delete;
+	MemoryFrame(MemoryFrame&&) = default;
+
+	~MemoryFrame() noexcept
+	{
+		onFrameDone();
+	}
 };
-using FrameDoneCallback = std::function<void()>;
 
 
 

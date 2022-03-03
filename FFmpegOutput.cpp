@@ -45,65 +45,61 @@ void FFmpegOutput::pushFrame(AVFrame_Heap frame)
 	scaler->enqueueFrame(std::move(frame));
 }
 
-AVFrame* wrapInAVFrame(const MemoryFrame& frame, FrameDoneCallback cb) noexcept
+AVFrame* wrapInAVFrame(std::unique_ptr<MemoryFrame> frame) noexcept
 {
 	auto f = av_frame_alloc();
-	f->width = frame.width;
-	f->height = frame.height;
-	f->format = pixelFormat2AV(frame.format);
-	f->data[0] = static_cast<uint8_t*>(frame.memory) + frame.offset;
-	f->linesize[0] = frame.stride;
+	f->width = frame->width;
+	f->height = frame->height;
+	f->format = pixelFormat2AV(frame->format);
+	f->data[0] = static_cast<uint8_t*>(frame->memory) + frame->offset;
+	f->linesize[0] = frame->stride;
 
-	auto callbackOnHeap = new FrameDoneCallback(std::move(cb));
 	auto frameDeleter = [](void* u, uint8_t*)
 	{
-		auto cb = static_cast<FrameDoneCallback*>(u);
-		(*cb)();
-		delete cb;
+		auto f = static_cast<MemoryFrame*>(u);
+		delete f;
 	};
 	// create a dummy AVBuffer so reference counting works, but do not let it free the memory we don't own
-	f->buf[0] = av_buffer_create(static_cast<uint8_t*>(frame.memory), frame.size, frameDeleter, callbackOnHeap, AV_BUFFER_FLAG_READONLY);
+	f->buf[0] = av_buffer_create(static_cast<uint8_t*>(frame->memory), frame->size, frameDeleter, frame.release(), AV_BUFFER_FLAG_READONLY);
 	return f;
 }
 
-AVFrame* wrapInAVFrame(const DmaBufFrame& frame, FrameDoneCallback cb) noexcept
+AVFrame* wrapInAVFrame(std::unique_ptr<DmaBufFrame> frame) noexcept
 {
 	// construct an AVFrame that references a piece of DRM video memory
 
 	// copy over the information about the DRM PRIME file descriptor and the frame properties
 	auto* d = new AVDRMFrameDescriptor;
 	d->nb_objects = 1;
-	d->objects[0].fd = frame.drmObject.fd;
-	d->objects[0].size = frame.drmObject.totalSize;
-	d->objects[0].format_modifier = frame.drmObject.modifier;
+	d->objects[0].fd = frame->drmObject.fd;
+	d->objects[0].size = frame->drmObject.totalSize;
+	d->objects[0].format_modifier = frame->drmObject.modifier;
 	d->nb_layers = 1;
-	d->layers[0].format = frame.drmFormat;
-	d->layers[0].nb_planes = frame.planeCount;
+	d->layers[0].format = frame->drmFormat;
+	d->layers[0].nb_planes = frame->planeCount;
 	for (uint32_t i = 0; i < d->layers[0].nb_planes; ++i)
 	{
 		d->layers[0].planes[i].object_index = 0;
-		d->layers[0].planes[i].offset = frame.planes[i].offset;
-		d->layers[0].planes[i].pitch = frame.planes[i].pitch;
+		d->layers[0].planes[i].offset = frame->planes[i].offset;
+		d->layers[0].planes[i].pitch = frame->planes[i].pitch;
 	}
 
 	// the frame must have the format DRM_PRIME and contain a pointer to the AVDRMFrameDescriptor
 	AVFrame* f = av_frame_alloc();
 	f->format = AV_PIX_FMT_DRM_PRIME;
 	f->data[0] = reinterpret_cast<uint8_t*>(d);
-	f->width = frame.width;
-	f->height = frame.height;
+	f->width = frame->width;
+	f->height = frame->height;
 
-	// make sure reference counting works and the callback is called when the frame is deleted
-	auto callbackOnHeap = new FrameDoneCallback(std::move(cb));
+	// make sure reference counting works and the frame is deleted when no longer needed
 	auto frameDeleter = [](void* userData, uint8_t* bufData)
 	{
-		auto cb = static_cast<FrameDoneCallback*>(userData);
-		(*cb)();
-		delete cb;
+		auto f = static_cast<DmaBufFrame*>(userData);
+		delete f;
 		auto d = reinterpret_cast<AVDRMFrameDescriptor*>(bufData);
 		delete d;
 	};
-	f->buf[0] = av_buffer_create(f->data[0], 0, frameDeleter, callbackOnHeap, AV_BUFFER_FLAG_READONLY);
+	f->buf[0] = av_buffer_create(f->data[0], 0, frameDeleter, frame.release(), AV_BUFFER_FLAG_READONLY);
 	return f;
 }
 

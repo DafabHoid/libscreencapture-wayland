@@ -29,17 +29,21 @@ namespace pw
  * @param isDmaBuf true if the stream provides DmaBufFrame, false for MemoryFrame */
 using StreamConnectedCallback = std::function<void(Rect dimensions, PixelFormat format, bool isDmaBuf)>;
 
-/** This callback function is called for every frame in the PipeWire stream, if the stream uses
- * conventional memory.
- * @param frame the frame data including its dimensions, format and a pointer to pixel data
- * @param cb a callback function to call when you are done using the frame data, to release its resources */
-using PushMemoryFrameCallback = std::function<void(const MemoryFrame& frame, FrameDoneCallback cb)>;
+/** This callback function is called when the stream is disconnected.
+ * You should stop all ongoing processing of frames here and release all frames that were
+ * previously given to you by a PushFrame callback. */
+using StreamDisconnectedCallback = std::function<void()>;
 
 /** This callback function is called for every frame in the PipeWire stream, if the stream uses
- * DmaBuf (GPU) memory.
+ * conventional memory. Remember to keep a reference to this frame while using its pixel data.
+ * @param frame the frame data including its dimensions, format and a pointer to pixel data */
+using PushMemoryFrameCallback = std::function<void(std::unique_ptr<MemoryFrame> frame)>;
+
+/** This callback function is called for every frame in the PipeWire stream, if the stream uses
+ * DmaBuf (GPU) memory. Remember to keep a reference to this frame while using its file descriptor.
  * @param frame the frame data including its dimensions, format and a DRM PRIME file descriptor
  * @param cb a callback function to call when you are done using the frame data, to release its resources */
-using PushDmaBufFrameCallback = std::function<void(const DmaBufFrame& frame, FrameDoneCallback cb)>;
+using PushDmaBufFrameCallback = std::function<void(std::unique_ptr<DmaBufFrame> frame)>;
 
 class PipeWireStream;
 
@@ -72,6 +76,7 @@ class PipeWireStream
 	std::exception_ptr streamException;
 
 	StreamConnectedCallback streamConnected;
+	StreamDisconnectedCallback streamDisconnected;
 	PushMemoryFrameCallback pushMemoryFrame;
 	PushDmaBufFrameCallback pushDmaBufFrame;
 
@@ -84,6 +89,7 @@ public:
 	 * The given callback functions are called for their respective events. See their documentation for information
 	 * about how they are used. */
 	PipeWireStream(const SharedScreen& shareInfo, StreamConnectedCallback streamConnected,
+	               StreamDisconnectedCallback streamDisconnected,
 	               PushMemoryFrameCallback pushMemoryFrameCb,
 	               PushDmaBufFrameCallback pushDmaBufFrameCb);
 

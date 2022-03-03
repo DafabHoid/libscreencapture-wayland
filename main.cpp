@@ -32,16 +32,21 @@ int main(int argc, char** argv)
 			{
 				ffmpegOutput = std::make_unique<ffmpeg::FFmpegOutput>(dimensions, format, isDmaBuf);
 			};
-			auto pushMemoryFrameCb = [&ffmpegOutput](const MemoryFrame& frame, FrameDoneCallback cb)
+			auto streamDisconnectedCb = [&ffmpegOutput] ()
 			{
-				ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(frame, std::move(cb))));
+				ffmpegOutput.reset();
 			};
-			auto pushDmaBufFrameCb = [&ffmpegOutput](const DmaBufFrame& frame, FrameDoneCallback cb)
+			auto pushMemoryFrameCb = [&ffmpegOutput](std::unique_ptr<MemoryFrame> frame)
 			{
-				ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(frame, std::move(cb))));
+				ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(std::move(frame))));
+			};
+			auto pushDmaBufFrameCb = [&ffmpegOutput](std::unique_ptr<DmaBufFrame> frame)
+			{
+				ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(std::move(frame))));
 			};
 			auto pwStream = pw::PipeWireStream(shareInfo.value(),
 											   std::move(streamConnectedCb),
+											   std::move(streamDisconnectedCb),
 											   std::move(pushMemoryFrameCb),
 											   std::move(pushDmaBufFrameCb));
 			pwStream.runStreamLoop();

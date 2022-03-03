@@ -111,18 +111,18 @@ void processFrame(void* userData) noexcept
 			printf("Memory-mapped buffer info: size = %x, stride = %x, ptr = %p\n",
 			       d.chunk->size, d.chunk->stride, d.data);
 			assert(b->buffer->n_datas == 1);
-			MemoryFrame frame{
-					.width = si->format.info.raw.size.width,
-					.height = si->format.info.raw.size.height,
-					.format = spa2pixelFormat(si->format.info.raw.format),
-					.memory = d.data,
-					.stride = static_cast<size_t>(d.chunk->stride),
-					.size = d.chunk->size,
-					.offset = d.chunk->offset
-			};
-			si->mainLoopInfo->pushMemoryFrame(frame, [si, b]() {
+			auto f = std::make_unique<MemoryFrame>();
+			f->width = si->format.info.raw.size.width;
+			f->height = si->format.info.raw.size.height;
+			f->format = spa2pixelFormat(si->format.info.raw.format);
+			f->memory = d.data;
+			f->stride = static_cast<size_t>(d.chunk->stride);
+			f->size = d.chunk->size;
+			f->offset = d.chunk->offset;
+			f->onFrameDone = [si, b]() {
 				pw_stream_queue_buffer(si->stream, b);
-			});
+			};
+			si->mainLoopInfo->pushMemoryFrame(std::move(f));
 		} else if (d.type == SPA_DATA_DmaBuf) {
 			unsigned int planeCount = std::min(b->buffer->n_datas, 4u);
 			printf("DMA-BUF info: fd = %ld, size = %x, stride = %x, planeCount = %u, offset = %x\n",
@@ -133,26 +133,27 @@ void processFrame(void* userData) noexcept
 			{
 				totalSize += b->buffer->datas[i].chunk->size;
 			}
-			DmaBufFrame frame{
-					.width = si->format.info.raw.size.width,
-					.height = si->format.info.raw.size.height,
-					.drmFormat = spa2drmFormat(si->format.info.raw.format),
-					.drmObject = {
-							.fd = static_cast<int>(b->buffer->datas[0].fd),
-							.totalSize = totalSize,
-							.modifier = static_cast<uint64_t>(si->format.info.raw.modifier),
-					},
-					.planeCount = planeCount
+
+			auto f = std::make_unique<DmaBufFrame>();
+			f->width = si->format.info.raw.size.width;
+			f->height = si->format.info.raw.size.height;
+			f->drmFormat = spa2drmFormat(si->format.info.raw.format);
+			f->drmObject = {
+					.fd = static_cast<int>(b->buffer->datas[0].fd),
+					.totalSize = totalSize,
+					.modifier = static_cast<uint64_t>(si->format.info.raw.modifier),
+			};
+			f->planeCount = planeCount;
+			f->onFrameDone = [si, b]() {
+				pw_stream_queue_buffer(si->stream, b);
 			};
 			for (unsigned int l = 0; l < planeCount; ++l) {
-				auto& plane = frame.planes[l];
+				auto& plane = f->planes[l];
 				spa_chunk& chunk = *b->buffer->datas[l].chunk;
 				plane.offset = chunk.offset;
 				plane.pitch = chunk.stride;
 			}
-			si->mainLoopInfo->pushDmaBufFrame(frame, [si, b]() {
-				pw_stream_queue_buffer(si->stream, b);
-			});
+			si->mainLoopInfo->pushDmaBufFrame(std::move(f));
 		}
 	}
 	catch (const std::exception& e)
@@ -181,6 +182,7 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 	}
 	else if (old == PW_STREAM_STATE_STREAMING)
 	{
+		si->mainLoopInfo->streamDisconnected();
 		si->mainLoopInfo->quit();
 	}
 }
@@ -296,14 +298,16 @@ static const spa_pod* buildStreamParams(spa_pod_builder& b, bool withDMABuf)
 }
 
 PipeWireStream::PipeWireStream(const SharedScreen& shareInfo,
-                                   StreamConnectedCallback streamConnected,
-                                   PushMemoryFrameCallback pushMemoryFrameCb,
-                                   PushDmaBufFrameCallback pushDmaBufFrameCb)
+                               StreamConnectedCallback streamConnected,
+                               StreamDisconnectedCallback streamDisconnected,
+                               PushMemoryFrameCallback pushMemoryFrameCb,
+                               PushDmaBufFrameCallback pushDmaBufFrameCb)
 : mainLoop{pw_main_loop_new(nullptr)},
   ctx{pw_context_new(pw_main_loop_get_loop(mainLoop), nullptr, 0)},
   core{},
   streamInfo{},
   streamConnected{std::move(streamConnected)},
+  streamDisconnected{std::move(streamDisconnected)},
   pushMemoryFrame{std::move(pushMemoryFrameCb)},
   pushDmaBufFrame{std::move(pushDmaBufFrameCb)}
 {
