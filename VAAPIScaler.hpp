@@ -46,28 +46,28 @@ public:
 	 * @param vaapiDevice the VAAPI device that should do the scaling
 	 * @param inputIsDRMPrime if the input frames are DRM PRIME frames instead of normal memory frames
 	 * @param cb the callback to call when a scaled frame becomes available */
-	VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targetSize,
+	SCW_EXPORT VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targetSize,
 	            AVBufferRef* drmDevice, AVBufferRef* vaapiDevice, bool inputIsDRMPrime, ScalingDoneCallback cb);
 
-	~VAAPIScaler() noexcept;
+	SCW_EXPORT ~VAAPIScaler() noexcept;
 
 	/** Add a frame into the scaling queue. It can be retrieved by dequeueFrame().
 	 * If the queue is full, the frame will by silently dropped.
 	 * This function is thread-safe. */
-	void enqueueFrame(AVFrame_Heap frame);
+	SCW_EXPORT void enqueueFrame(AVFrame_Heap frame);
 
 	struct EndOfQueue {};
 	/** Get a frame from the scaling queue. If the queue is empty, this will block until
 	 * a frame is added to the queue by enqueueFrame().
 	 * When the queue is EOF, return #EndOfQueue.
 	 * This function is thread-safe. */
-	std::variant<AVFrame_Heap, EndOfQueue> dequeueFrame();
+	SCW_EXPORT std::variant<AVFrame_Heap, EndOfQueue> dequeueFrame();
 
 	/** Scale a single frame.
 	 * After scaling, the given ScalingDoneCallback is called with the scaled frame.
 	 * Ownership of the frame is transferred to the callback.
 	 * This function is NOT thread-safe. */
-	void scaleFrame(AVFrame& frame);
+	SCW_EXPORT void scaleFrame(AVFrame& frame);
 };
 
 }

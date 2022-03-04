@@ -91,22 +91,22 @@ public:
 	 * To actually start streaming and pushing frames to the later stages, you need to call runStreamLoop().
 	 * The given callback interface's methods are called for their respective events. See its documentation for information
 	 * about how they are used. */
-	PipeWireStream(const SharedScreen& shareInfo, StreamCallbacks& streamCallbacks);
+	SCW_EXPORT PipeWireStream(const SharedScreen& shareInfo, StreamCallbacks& streamCallbacks);
 
-	~PipeWireStream() noexcept;
+	SCW_EXPORT ~PipeWireStream() noexcept;
 
 	/** Run a PipeWire main loop to process all events of this stream.
 	 * This function will block as long as the loop is running. It can be stopped by calling quit().
 	 * @throw std::exception if an exception was set with setError() while the loop ran */
-	void runStreamLoop();
+	SCW_EXPORT void runStreamLoop();
 
 	/** Store the given exception to pass it to the caller of runStreamLoop(), once the
 	 * stream loop quits. */
-	void setError(std::exception_ptr) noexcept;
+	SCW_EXPORT void setError(std::exception_ptr) noexcept;
 
 	/** Quit the currently running stream loop, so the call to runStreamLoop() returns.
 	 * Can be called from any thread. */
-	void quit() noexcept;
+	SCW_EXPORT void quit() noexcept;
 };
 
 } // namespace pw

@@ -11,7 +11,7 @@
 #include <memory> // unique_ptr
 #include <optional>
 
-
+#define SCW_EXPORT __attribute__((visibility("default")))
 
 
 #include <sdbus-c++/IConnection.h>
@@ -97,7 +97,7 @@ struct MemoryFrame
 
 
 
-extern void dumpStackTrace(const char* filename = "trace.txt") noexcept;
+extern SCW_EXPORT void dumpStackTrace(const char* filename = "trace.txt") noexcept;
 
 
 

@@ -30,11 +30,11 @@ class FFmpegOutput
 	std::unique_ptr<Muxer> muxer;
 
 public:
-	FFmpegOutput(Rect sourceDimensions, PixelFormat sourcePixelFormat, bool withDRMPrime);
+	SCW_EXPORT FFmpegOutput(Rect sourceDimensions, PixelFormat sourcePixelFormat, bool withDRMPrime);
 
-	~FFmpegOutput() noexcept;
+	SCW_EXPORT ~FFmpegOutput() noexcept;
 
-	void pushFrame(AVFrame_Heap frame);
+	SCW_EXPORT void pushFrame(AVFrame_Heap frame);
 };
 
 }

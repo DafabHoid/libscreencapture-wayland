@@ -26,7 +26,7 @@ namespace portal
  *     (may be ignored by the portal)
  * @return A SharedScreen object on success, or nothing if the user cancelled the request
  * @throw std::exception if an I/O or protocol error occurs */
-std::optional<SharedScreen> requestPipeWireShare(CursorMode cursorMode);
+SCW_EXPORT std::optional<SharedScreen> requestPipeWireShare(CursorMode cursorMode);
 
 }
 
@@ -43,9 +43,9 @@ typedef struct
 	uint32_t pipeWireNode;
 } SharedScreen_t;
 
-SharedScreen_t* requestPipeWireShareFromPortal(enum CursorMode cursorMode);
+SCW_EXPORT SharedScreen_t* requestPipeWireShareFromPortal(enum CursorMode cursorMode);
 
-void dropSharedScreen(SharedScreen_t* shareInfo);
+SCW_EXPORT void dropSharedScreen(SharedScreen_t* shareInfo);
 
 
 #ifdef __cplusplus

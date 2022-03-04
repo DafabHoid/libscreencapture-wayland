@@ -40,8 +40,8 @@ static constexpr inline AVPixelFormat pixelFormat2AV(PixelFormat format)
 	}
 }
 
-AVFrame* wrapInAVFrame(std::unique_ptr<MemoryFrame> frame) noexcept;
-AVFrame* wrapInAVFrame(std::unique_ptr<DmaBufFrame> frame) noexcept;
+SCW_EXPORT AVFrame* wrapInAVFrame(std::unique_ptr<MemoryFrame> frame) noexcept;
+SCW_EXPORT AVFrame* wrapInAVFrame(std::unique_ptr<DmaBufFrame> frame) noexcept;
 
 struct AVFrameFree
 {
