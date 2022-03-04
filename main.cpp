@@ -27,28 +27,29 @@ int main(int argc, char** argv)
 		pw_init(&argc, &argv);
 
 		{
-			std::unique_ptr<ffmpeg::FFmpegOutput> ffmpegOutput;
-			auto streamConnectedCb = [&ffmpegOutput] (Rect dimensions, PixelFormat format, bool isDmaBuf)
+			class Stream2FFmpeg : public pw::StreamCallbacks
 			{
-				ffmpegOutput = std::make_unique<ffmpeg::FFmpegOutput>(dimensions, format, isDmaBuf);
+				std::unique_ptr<ffmpeg::FFmpegOutput> ffmpegOutput;
+			public:
+				void streamConnected(Rect dimensions, PixelFormat format, bool isDmaBuf) override
+				{
+					ffmpegOutput = std::make_unique<ffmpeg::FFmpegOutput>(dimensions, format, isDmaBuf);
+				}
+				void streamDisconnected() override
+				{
+					ffmpegOutput.reset();
+				}
+				void pushMemoryFrame(std::unique_ptr<MemoryFrame> frame) override
+				{
+					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(std::move(frame))));
+				}
+				void pushDmaBufFrame(std::unique_ptr<DmaBufFrame> frame) override
+				{
+					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(std::move(frame))));
+				}
 			};
-			auto streamDisconnectedCb = [&ffmpegOutput] ()
-			{
-				ffmpegOutput.reset();
-			};
-			auto pushMemoryFrameCb = [&ffmpegOutput](std::unique_ptr<MemoryFrame> frame)
-			{
-				ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(std::move(frame))));
-			};
-			auto pushDmaBufFrameCb = [&ffmpegOutput](std::unique_ptr<DmaBufFrame> frame)
-			{
-				ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(std::move(frame))));
-			};
-			auto pwStream = pw::PipeWireStream(shareInfo.value(),
-											   std::move(streamConnectedCb),
-											   std::move(streamDisconnectedCb),
-											   std::move(pushMemoryFrameCb),
-											   std::move(pushDmaBufFrameCb));
+			Stream2FFmpeg stream2FFmpeg;
+			auto pwStream = pw::PipeWireStream(shareInfo.value(), stream2FFmpeg);
 			pwStream.runStreamLoop();
 		}
 

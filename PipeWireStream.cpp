@@ -122,7 +122,7 @@ void processFrame(void* userData) noexcept
 			f->onFrameDone = [si, b]() {
 				pw_stream_queue_buffer(si->stream, b);
 			};
-			si->mainLoopInfo->pushMemoryFrame(std::move(f));
+			si->mainLoopInfo->streamCallbacks.pushMemoryFrame(std::move(f));
 		} else if (d.type == SPA_DATA_DmaBuf) {
 			unsigned int planeCount = std::min(b->buffer->n_datas, 4u);
 			printf("DMA-BUF info: fd = %ld, size = %x, stride = %x, planeCount = %u, offset = %x\n",
@@ -153,7 +153,7 @@ void processFrame(void* userData) noexcept
 				plane.offset = chunk.offset;
 				plane.pitch = chunk.stride;
 			}
-			si->mainLoopInfo->pushDmaBufFrame(std::move(f));
+			si->mainLoopInfo->streamCallbacks.pushDmaBufFrame(std::move(f));
 		}
 	}
 	catch (const std::exception& e)
@@ -173,7 +173,7 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 		auto& raw = si->format.info.raw;
 		try
 		{
-			si->mainLoopInfo->streamConnected(Rect {raw.size.width, raw.size.height}, spa2pixelFormat(raw.format), si->haveDmaBuf);
+			si->mainLoopInfo->streamCallbacks.streamConnected(Rect {raw.size.width, raw.size.height}, spa2pixelFormat(raw.format), si->haveDmaBuf);
 		}
 		catch (const std::exception& e)
 		{
@@ -182,7 +182,7 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 	}
 	else if (old == PW_STREAM_STATE_STREAMING)
 	{
-		si->mainLoopInfo->streamDisconnected();
+		si->mainLoopInfo->streamCallbacks.streamDisconnected();
 		si->mainLoopInfo->quit();
 	}
 }
@@ -298,18 +298,12 @@ static const spa_pod* buildStreamParams(spa_pod_builder& b, bool withDMABuf)
 }
 
 PipeWireStream::PipeWireStream(const SharedScreen& shareInfo,
-                               StreamConnectedCallback streamConnected,
-                               StreamDisconnectedCallback streamDisconnected,
-                               PushMemoryFrameCallback pushMemoryFrameCb,
-                               PushDmaBufFrameCallback pushDmaBufFrameCb)
+                               StreamCallbacks& cbs)
 : mainLoop{pw_main_loop_new(nullptr)},
   ctx{pw_context_new(pw_main_loop_get_loop(mainLoop), nullptr, 0)},
   core{},
   streamInfo{},
-  streamConnected{std::move(streamConnected)},
-  streamDisconnected{std::move(streamDisconnected)},
-  pushMemoryFrame{std::move(pushMemoryFrameCb)},
-  pushDmaBufFrame{std::move(pushDmaBufFrameCb)}
+  streamCallbacks{cbs}
 {
 #ifndef NDEBUG
 	pw_log_set_level(spa_log_level::SPA_LOG_LEVEL_DEBUG);
