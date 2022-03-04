@@ -10,27 +10,44 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS False)
 
+option(ENABLE_PORTAL_MODULE "Enable the xdg-desktop-portal module" ON)
+option(ENABLE_PIPEWIRE_MODULE "Enable the PipeWire module" ON)
+option(ENABLE_FFMPEG_MODULE "Enable the FFmpeg encoder module" ON)
+option(BUILD_SHARED_LIBS "Build a shared library instead of a static one" OFF)
 option(BUILD_FFMPEG "Build own ffmpeg libraries instead of using system-provided ones" OFF)
 option(USE_LIBC++ "Use libc++ as C++ standard library instead of libstdc++ when compiling with clang" ON)
 # use static C++ library by default to reduce possible ABI breakages at runtime
 option(STATIC_LIBSTDC++ "Link with static C++ standard library" ON)
 
-if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
-    if (${USE_LIBC++})
-        set(stdlib libc++)
-        set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -stdlib=${stdlib})
-    endif()
+# set cpu requirements to a more modern instruction set: x86-64-v3 (includes AVX2, BMI etc.)
+set(CMAKE_CXX_FLAGS "-march=x86-64-v3 -save-temps=obj -masm=intel ${CMAKE_CXX_FLAGS}")
+
+# set stdlib flags globally if enabled on clang
+if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" AND ${USE_LIBC++})
+    set(stdlib libc++)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=${stdlib}")
     find_program(lld NAMES lld)
-    if(NOT lld AND ${USE_LIBC++} AND ${STATIC_LIBSTDC++})
+    if(NOT lld AND ${STATIC_LIBSTDC++})
         message(WARNING "LLVM linker lld not found. It is required to properly link the libc++ library statically")
     endif()
 endif()
-add_subdirectory(sdbus-cpp)
+
+######################################
+# Dependencies
+######################################
 
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(pipewire REQUIRED IMPORTED_TARGET libpipewire-0.3)
 
+if(ENABLE_PORTAL_MODULE)
+    add_subdirectory(sdbus-cpp)
+endif()
+
+if(ENABLE_PIPEWIRE_MODULE)
+    pkg_check_modules(pipewire REQUIRED IMPORTED_TARGET libpipewire-0.3)
+endif()
+
+if (ENABLE_FFMPEG_MODULE)
 if (${BUILD_FFMPEG})
     include(cmake/BuildFFmpeg.cmake)
     set(FFMPEG_LIBS
@@ -48,16 +65,65 @@ else()
             PkgConfig::libavformat
             PkgConfig::libavfilter
             PkgConfig::libavutil)
+endif() # BUILD_FFMPEG
+endif() # ENABLE_FFMPEG_MODULE
+
+
+
+######################################
+# Module definitions
+######################################
+
+add_library(screencapture-wayland common.hpp)
+target_link_options(screencapture-wayland PRIVATE -Wl,-z,now)
+if(${STATIC_LIBSTDC++})
+    target_link_options(screencapture-wayland PRIVATE -static-libstdc++)
 endif()
 
-# main binary
-add_executable(screencapture main.cpp xdg-desktop-portal.cpp common.hpp PipeWireStream.cpp FFmpegOutput.cpp VAAPIEncoder.cpp VAAPIEncoder.hpp VAAPIScaler.cpp VAAPIScaler.hpp Muxer.cpp Muxer.hpp libavcommon.hpp BlockingRingbuffer.hpp PipeWireStream.hpp xdg-desktop-portal.h FFmpegOutput.hpp)
-if(${BUILD_FFMPEG})
-    add_dependencies(screencapture ffmpeg)
+
+if(ENABLE_PORTAL_MODULE)
+    add_library(screencapture-module-portal OBJECT common.hpp
+            xdg-desktop-portal.cpp xdg-desktop-portal.h)
+    target_link_libraries(screencapture-module-portal PUBLIC sdbus-c++)
+    set_property(TARGET screencapture-module-portal PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+
+    target_link_libraries(screencapture-wayland PUBLIC screencapture-module-portal)
 endif()
-target_include_directories(screencapture PRIVATE ringbuffer/include/)
-target_compile_options(screencapture PRIVATE -march=x86-64-v3 -mtune=native -save-temps=obj -masm=intel)
-target_link_libraries(screencapture PRIVATE sdbus-c++ PkgConfig::pipewire ${FFMPEG_LIBS} Threads::Threads)
+
+
+if (ENABLE_PIPEWIRE_MODULE)
+    add_library(screencapture-module-pipewire OBJECT common.hpp
+            PipeWireStream.cpp PipeWireStream.hpp)
+    target_link_libraries(screencapture-module-pipewire PUBLIC PkgConfig::pipewire)
+    set_property(TARGET screencapture-module-pipewire PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+
+    target_link_libraries(screencapture-wayland PUBLIC screencapture-module-pipewire)
+endif()
+
+
+if (ENABLE_FFMPEG_MODULE)
+    add_library(screencapture-module-ffmpeg OBJECT libavcommon.hpp
+            BlockingRingbuffer.hpp
+            FFmpegOutput.cpp FFmpegOutput.hpp
+            VAAPIEncoder.cpp VAAPIEncoder.hpp
+            VAAPIScaler.cpp VAAPIScaler.hpp
+            Muxer.cpp Muxer.hpp)
+    target_link_libraries(screencapture-module-ffmpeg PUBLIC ${FFMPEG_LIBS} Threads::Threads)
+    set_property(TARGET screencapture-module-ffmpeg PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+    if(${BUILD_FFMPEG})
+        add_dependencies(screencapture-module-ffmpeg ffmpeg)
+    endif()
+
+    target_link_libraries(screencapture-wayland PUBLIC screencapture-module-ffmpeg)
+endif()
+
+
+######################################
+# main binary
+######################################
+
+add_executable(screencapture main.cpp)
+target_link_libraries(screencapture PRIVATE screencapture-wayland)
 
 # enable Full RELRO
 target_link_options(screencapture PRIVATE -Wl,-z,now)
