@@ -76,9 +76,6 @@ endif() # ENABLE_FFMPEG_MODULE
 
 add_library(screencapture-wayland common.hpp)
 target_link_options(screencapture-wayland PRIVATE -Wl,-z,now)
-if(${STATIC_LIBSTDC++})
-    target_link_options(screencapture-wayland PRIVATE -static-libstdc++)
-endif()
 
 
 if(ENABLE_PORTAL_MODULE)
