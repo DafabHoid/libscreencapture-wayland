@@ -107,8 +107,10 @@ endif()
 
 
 if (ENABLE_PIPEWIRE_MODULE)
-    add_library(screencapture-module-pipewire OBJECT common.hpp
-            PipeWireStream.cpp PipeWireStream.hpp)
+    add_library(screencapture-module-pipewire OBJECT common.hpp include/c_common.h
+            PipeWireStream.cpp PipeWireStream.hpp
+            include/module-pipewire.h)
+    target_include_directories(screencapture-module-pipewire PUBLIC include/)
     target_link_libraries(screencapture-module-pipewire PUBLIC PkgConfig::pipewire)
     set_property(TARGET screencapture-module-pipewire PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
 

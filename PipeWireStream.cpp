@@ -389,3 +389,146 @@ void PipeWireStream::runStreamLoop()
 }
 
 }
+
+
+// C interface
+#include <module-pipewire.h>
+
+static constexpr inline PixelFormat toCFormat(pw::PixelFormat format)
+{
+	switch (format)
+	{
+		case pw::PixelFormat::BGRA:
+			return PixelFormat::BGRA;
+		case pw::PixelFormat::RGBA:
+			return PixelFormat::RGBA;
+		case pw::PixelFormat::BGRX:
+			return PixelFormat::BGRX;
+		case pw::PixelFormat::RGBX:
+			return PixelFormat::RGBX;
+	}
+}
+
+class CallbackWrapper : public pw::StreamCallbacks
+{
+	const StreamCallbacks_t* c_callbacks;
+
+public:
+	explicit CallbackWrapper(const StreamCallbacks_t* toWrap)
+	: c_callbacks(toWrap)
+	{}
+
+	void streamConnected(pw::Rect dimensions, pw::PixelFormat format, bool isDmaBuf) override
+	{
+		::Rect c_dimensions = {
+				dimensions.w,
+				dimensions.h
+		};
+		::PixelFormat c_format = toCFormat(format);
+		c_callbacks->streamConnected(&c_dimensions, c_format, isDmaBuf);
+	}
+
+	void streamDisconnected() override
+	{
+		c_callbacks->streamDisconnected();
+	}
+
+	static void onMemoryFrameDoneWrapper(void* opaque) noexcept
+	{
+		auto cb = static_cast<pw::MemoryFrame*>(opaque);
+		delete cb;
+	}
+
+	static void onDmaBufFrameDoneWrapper(void* opaque) noexcept
+	{
+		auto cb = static_cast<pw::DmaBufFrame*>(opaque);
+		delete cb;
+	}
+
+	void pushMemoryFrame(std::unique_ptr<pw::MemoryFrame> frame) override
+	{
+		auto c_frame = static_cast<::MemoryFrame*>(calloc(1, sizeof(::MemoryFrame)));
+		c_frame->width = frame->width;
+		c_frame->height = frame->height;
+		c_frame->format = toCFormat(frame->format);
+		c_frame->memory = frame->memory;
+		c_frame->size = frame->size;
+		c_frame->stride = frame->stride;
+		c_frame->offset = frame->offset;
+
+		c_frame->opaque = frame.release();
+		c_frame->onFrameDone = &onMemoryFrameDoneWrapper;
+
+		c_callbacks->pushMemoryFrame(c_frame);
+	}
+
+	void pushDmaBufFrame(std::unique_ptr<pw::DmaBufFrame> frame) override
+	{
+		auto c_frame = static_cast<::DmaBufFrame*>(calloc(1, sizeof(::DmaBufFrame)));
+		c_frame->width = frame->width;
+		c_frame->height = frame->height;
+		c_frame->drmFormat = frame->drmFormat;
+		memcpy(&c_frame->drmObject, &frame->drmObject, sizeof(frame->drmObject));
+		c_frame->planeCount = frame->planeCount;
+		memcpy(c_frame->planes, frame->planes, sizeof(frame->planes));
+
+		c_frame->opaque = frame.release();
+		c_frame->onFrameDone = &onDmaBufFrameDoneWrapper;
+
+		c_callbacks->pushDmaBufFrame(c_frame);
+	}
+};
+
+struct PipeWireStream
+{
+	std::unique_ptr<pw::PipeWireStream> cppStream;
+	CallbackWrapper wrappedCallbacks;
+};
+
+struct PipeWireStream* PipeWireStream_connect(const SharedScreen_t* c_shareInfo, const StreamCallbacks_t* cbs)
+{
+	auto* pws = new PipeWireStream {
+			nullptr,
+			CallbackWrapper(cbs)
+	};
+	try
+	{
+		pw::SharedScreen shareInfo = {
+				nullptr,
+				c_shareInfo->pipeWireFd,
+				c_shareInfo->pipeWireNode
+		};
+		pws->cppStream = std::make_unique<pw::PipeWireStream>(shareInfo, pws->wrappedCallbacks);
+	}
+	catch (const std::exception& e)
+	{
+		fprintf(stderr, "%s\n", e.what());
+		delete pws;
+		return nullptr;
+	}
+	return pws;
+}
+
+void PipeWireStream_free(struct PipeWireStream* stream)
+{
+	delete stream;
+}
+
+int PipeWireStream_runStreamLoop(struct PipeWireStream* stream)
+{
+	try
+	{
+		stream->cppStream->runStreamLoop();
+		return 0;
+	}
+	catch (const std::exception& e)
+	{
+		fprintf(stderr, "%s\n", e.what());
+		return 1;
+	}
+}
+
+void PipeWireStream_quit(struct PipeWireStream* stream)
+{
+	stream->cppStream->quit();
+}

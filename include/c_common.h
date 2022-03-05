@@ -20,6 +20,70 @@ typedef struct
 	uint32_t pipeWireNode;
 } SharedScreen_t;
 
+struct Rect
+{
+	unsigned int w;
+	unsigned int h;
+};
+
+enum PixelFormat
+{
+	BGRA,
+	BGRX,
+	RGBA,
+	RGBX,
+};
+
+typedef void (*FrameDoneCallback_t)(void*);
+
+struct MemoryFrame
+{
+	uint32_t width;
+	uint32_t height;
+	PixelFormat format;
+	void* memory;
+	size_t stride;
+	size_t size;
+	size_t offset;
+
+	void* opaque;
+	FrameDoneCallback_t onFrameDone;
+};
+
+__inline void freeMemoryFrame(struct MemoryFrame* frame)
+{
+	if (frame->onFrameDone)
+		frame->onFrameDone(frame->opaque);
+	free(frame);
+}
+
+struct DmaBufFrame
+{
+	uint32_t width;
+	uint32_t height;
+	uint64_t drmFormat;
+	struct {
+		int fd;
+		size_t totalSize;
+		uint64_t modifier;
+	} drmObject;
+	uint32_t planeCount;
+	struct {
+		size_t offset;
+		size_t pitch;
+	} planes[4];
+
+	void* opaque;
+	FrameDoneCallback_t onFrameDone;
+};
+
+__inline void freeDmaBufFrame(struct DmaBufFrame* frame)
+{
+	if (frame->onFrameDone)
+		frame->onFrameDone(frame->opaque);
+	free(frame);
+}
+
 
 
 
