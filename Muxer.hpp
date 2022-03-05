@@ -7,6 +7,7 @@
 #define SCREENCAPTURE_MUXER_HPP
 
 #include <string>
+#include "common.hpp"
 extern "C" {
 #include <libavformat/avformat.h>
 }
@@ -21,10 +22,10 @@ class Muxer
 	AVRational codecTimeBase;
 
 public:
-	Muxer(const std::string& outputURL, const std::string& containerFormat, const AVCodecContext* videoCodecCtx);
-	~Muxer() noexcept;
+	SCW_EXPORT Muxer(const std::string& outputURL, const std::string& containerFormat, const AVCodecContext* videoCodecCtx);
+	SCW_EXPORT ~Muxer() noexcept;
 
-	void writePacket(AVPacket& p);
+	SCW_EXPORT void writePacket(AVPacket& p);
 };
 
 }

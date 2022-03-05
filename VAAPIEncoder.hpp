@@ -32,17 +32,17 @@ class VAAPIEncoder
 	void encodeFramesLoop();
 
 public:
-	VAAPIEncoder(unsigned int width, unsigned int height, AVBufferRef* hwDevice, EncodedCallback cb);
-	~VAAPIEncoder() noexcept;
+	SCW_EXPORT VAAPIEncoder(unsigned int width, unsigned int height, AVBufferRef* hwDevice, EncodedCallback cb);
+	SCW_EXPORT ~VAAPIEncoder() noexcept;
 
-	void enqueueFrame(AVFrame_Heap frame);
+	SCW_EXPORT void enqueueFrame(AVFrame_Heap frame);
 	struct EndOfQueue {};
-	std::variant<AVFrame_Heap, EndOfQueue> dequeueFrame();
+	SCW_EXPORT std::variant<AVFrame_Heap, EndOfQueue> dequeueFrame();
 
-	void encodeFrame(AVFrame& gpuFrame);
+	SCW_EXPORT void encodeFrame(AVFrame& gpuFrame);
 
-	const AVCodec* getCodec() const noexcept { return codec; }
-	const AVCodecContext* getCodecContext() const noexcept { return codecContext; }
+	SCW_EXPORT const AVCodec* getCodec() const noexcept { return codec; }
+	SCW_EXPORT const AVCodecContext* getCodecContext() const noexcept { return codecContext; }
 };
 
 }
