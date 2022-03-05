@@ -16,6 +16,10 @@ extern "C" {
 
 namespace ffmpeg
 {
+using common::Rect;
+using common::PixelFormat;
+using common::MemoryFrame;
+using common::DmaBufFrame;
 
 class LibAVException : public std::exception
 {

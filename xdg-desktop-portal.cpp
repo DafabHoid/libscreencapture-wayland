@@ -265,7 +265,7 @@ SharedScreen_t* requestPipeWireShareFromPortal(CursorMode cursorMode)
 {
 	try
 	{
-		std::optional<SharedScreen> shareInfo = portal::requestPipeWireShare(cursorMode);
+		std::optional<portal::SharedScreen> shareInfo = portal::requestPipeWireShare(cursorMode);
 		if (!shareInfo)
 			return nullptr;
 		auto cStruct = new SharedScreen_t;

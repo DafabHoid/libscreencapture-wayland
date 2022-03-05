@@ -11,6 +11,7 @@
 
 namespace portal
 {
+using common::SharedScreen;
 
 /** Request a shared screen via D-Bus from xdg-desktop-portal. This will ask the user if they want
  * to share their screen and which screen to share to this application.

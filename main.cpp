@@ -16,7 +16,7 @@ int main(int argc, char** argv)
 {
 	try
 	{
-		std::optional<SharedScreen> shareInfo = portal::requestPipeWireShare(CURSOR_MODE_EMBED);
+		std::optional<portal::SharedScreen> shareInfo = portal::requestPipeWireShare(CURSOR_MODE_EMBED);
 		if (!shareInfo)
 		{
 			printf("User cancelled request\n");
@@ -31,7 +31,7 @@ int main(int argc, char** argv)
 			{
 				std::unique_ptr<ffmpeg::FFmpegOutput> ffmpegOutput;
 			public:
-				void streamConnected(Rect dimensions, PixelFormat format, bool isDmaBuf) override
+				void streamConnected(pw::Rect dimensions, pw::PixelFormat format, bool isDmaBuf) override
 				{
 					ffmpegOutput = std::make_unique<ffmpeg::FFmpegOutput>(dimensions, format, isDmaBuf);
 				}
@@ -39,11 +39,11 @@ int main(int argc, char** argv)
 				{
 					ffmpegOutput.reset();
 				}
-				void pushMemoryFrame(std::unique_ptr<MemoryFrame> frame) override
+				void pushMemoryFrame(std::unique_ptr<pw::MemoryFrame> frame) override
 				{
 					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(std::move(frame))));
 				}
-				void pushDmaBufFrame(std::unique_ptr<DmaBufFrame> frame) override
+				void pushDmaBufFrame(std::unique_ptr<pw::DmaBufFrame> frame) override
 				{
 					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(std::move(frame))));
 				}

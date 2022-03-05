@@ -16,6 +16,9 @@
 
 #include <sdbus-c++/IConnection.h>
 
+namespace common
+{
+
 struct SharedScreen
 {
 	/** The D-Bus connection through which the shared screen has been requested.
@@ -94,6 +97,8 @@ struct MemoryFrame
 		onFrameDone();
 	}
 };
+
+}
 
 
 

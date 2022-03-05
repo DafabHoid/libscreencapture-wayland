@@ -14,6 +14,11 @@
 
 namespace pw
 {
+using common::Rect;
+using common::PixelFormat;
+using common::MemoryFrame;
+using common::DmaBufFrame;
+using common::SharedScreen;
 
 class StreamCallbacks
 {
