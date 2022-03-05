@@ -90,13 +90,15 @@ endif() # ENABLE_FFMPEG_MODULE
 # Module definitions
 ######################################
 
-add_library(screencapture-wayland common.hpp)
+add_library(screencapture-wayland common.hpp include/c_common.h)
 target_link_options(screencapture-wayland PRIVATE -Wl,-z,now)
 
 
 if(ENABLE_PORTAL_MODULE)
-    add_library(screencapture-module-portal OBJECT common.hpp
-            xdg-desktop-portal.cpp xdg-desktop-portal.h)
+    add_library(screencapture-module-portal OBJECT common.hpp include/c_common.h
+            xdg-desktop-portal.cpp xdg-desktop-portal.hpp
+            include/module-portal.h)
+    target_include_directories(screencapture-module-portal PUBLIC include/)
     target_link_libraries(screencapture-module-portal PUBLIC sdbus-c++)
     set_property(TARGET screencapture-module-portal PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
 

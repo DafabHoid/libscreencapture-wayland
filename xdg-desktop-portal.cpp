@@ -4,7 +4,7 @@
    SPDX-License-Identifier: GPL-3.0-or-later
 *******************************************************************************/
 #include <sdbus-c++/sdbus-c++.h>
-#include "xdg-desktop-portal.h"
+#include "xdg-desktop-portal.hpp"
 #include <cstdio>
 #include <cstdarg>
 #include <random>

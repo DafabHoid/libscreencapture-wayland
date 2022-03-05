@@ -1,6 +1,6 @@
 #include <pipewire/pipewire.h>
 #include "PipeWireStream.hpp"
-#include "xdg-desktop-portal.h"
+#include "xdg-desktop-portal.hpp"
 #include "FFmpegOutput.hpp"
 #include <cstdio>
 #include <unistd.h>
