@@ -104,10 +104,7 @@ AVFrame* wrapInAVFrame(std::unique_ptr<DmaBufFrame> frame) noexcept
 }
 
 FFmpegOutput::FFmpegOutput(Rect sourceDimensions, PixelFormat sourcePixelFormat, bool withDRMPrime)
-: width{sourceDimensions.w},
-  height{sourceDimensions.h},
-  format{sourcePixelFormat},
-  drmDevice{},
+: drmDevice{},
   vaapiDevice{}
 {
 #ifndef NDEBUG
@@ -136,8 +133,8 @@ FFmpegOutput::FFmpegOutput(Rect sourceDimensions, PixelFormat sourcePixelFormat,
 
 	muxer = std::make_unique<Muxer>("rtsp://[::1]:8654/screen", "rtsp", encoder->getCodecContext());
 
-	scaler = std::make_unique<VAAPIScaler>(Rect {width, height},
-	        pixelFormat2AV(format), Rect {targetWidth, targetHeight},
+	scaler = std::make_unique<VAAPIScaler>(sourceDimensions,
+	        pixelFormat2AV(sourcePixelFormat), Rect {targetWidth, targetHeight},
 	        drmDevice, vaapiDevice, withDRMPrime,
 	        [this] (AVFrame_Heap f)
 	        {

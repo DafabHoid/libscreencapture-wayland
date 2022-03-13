@@ -19,9 +19,6 @@ namespace ffmpeg
 
 class FFmpegOutput
 {
-	unsigned int width;
-	unsigned int height;
-	PixelFormat format;
 	AVBufferRef *drmDevice;
 	AVBufferRef *vaapiDevice;
 	std::chrono::time_point<std::chrono::steady_clock> startTime;
