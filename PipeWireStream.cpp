@@ -125,14 +125,8 @@ void processFrame(void* userData) noexcept
 			si->mainLoopInfo->streamCallbacks.pushMemoryFrame(std::move(f));
 		} else if (d.type == SPA_DATA_DmaBuf) {
 			unsigned int planeCount = std::min(b->buffer->n_datas, 4u);
-			printf("DMA-BUF info: fd = %ld, size = %x, stride = %x, planeCount = %u, offset = %x\n",
-			       d.fd, d.chunk->size, d.chunk->stride, planeCount, d.chunk->offset);
-			// sum up all chunk sizes
-			size_t totalSize = 0;
-			for (unsigned int i = 0; i < planeCount; ++i)
-			{
-				totalSize += b->buffer->datas[i].chunk->size;
-			}
+			printf("DMA-BUF info: fd = %ld, size = %x, totalSize = %x, stride = %x, planeCount = %u, offset = %x\n",
+			       d.fd, d.chunk->size, d.maxsize, d.chunk->stride, planeCount, d.chunk->offset);
 
 			auto f = std::make_unique<DmaBufFrame>();
 			f->width = si->format.info.raw.size.width;
@@ -140,7 +134,7 @@ void processFrame(void* userData) noexcept
 			f->drmFormat = spa2drmFormat(si->format.info.raw.format);
 			f->drmObject = {
 					.fd = static_cast<int>(b->buffer->datas[0].fd),
-					.totalSize = totalSize,
+					.totalSize = b->buffer->datas[0].maxsize,
 					.modifier = static_cast<uint64_t>(si->format.info.raw.modifier),
 			};
 			f->planeCount = planeCount;
