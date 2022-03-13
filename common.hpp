@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory> // unique_ptr
 #include <optional>
+#include <chrono>
 
 #define SCW_EXPORT [[gnu::visibility("default")]]
 
@@ -53,6 +54,7 @@ struct DmaBufFrame
 {
 	uint32_t width;
 	uint32_t height;
+	std::chrono::nanoseconds pts;
 	uint64_t drmFormat;
 	struct {
 		int fd;
@@ -80,6 +82,7 @@ struct MemoryFrame
 {
 	uint32_t width;
 	uint32_t height;
+	std::chrono::nanoseconds pts;
 	PixelFormat format;
 	void* memory;
 	size_t stride;

@@ -16,6 +16,8 @@
 #include <libdrm/drm_fourcc.h>
 #include <signal.h> // sigaction
 
+using namespace std::chrono;
+
 namespace pw
 {
 
@@ -85,7 +87,7 @@ void processFrame(void* userData) noexcept
 	}
 
 	spa_meta_cursor *mcs;
-	mcs = static_cast<spa_meta_cursor *>(spa_buffer_find_meta_data(b->buffer, SPA_META_Cursor, sizeof(*mcs)));
+	mcs = static_cast<spa_meta_cursor*>(spa_buffer_find_meta_data(b->buffer, SPA_META_Cursor, sizeof(*mcs)));
 	if (mcs && spa_meta_cursor_is_valid(mcs))
 	{
 		si->cursorPos.x = mcs->position.x;
@@ -105,25 +107,45 @@ void processFrame(void* userData) noexcept
 					si->cursorBitmap.w, si->cursorBitmap.h, spa_debug_type_find_name(spa_type_video_format, mb->format));
 		}
 	}
-	try {
+
+	nanoseconds pts;
+	spa_meta_header* header;
+	header = static_cast<spa_meta_header*>(spa_buffer_find_meta_data(b->buffer, SPA_META_Header, sizeof(*header)));
+	if (header)
+	{
+		pts = nanoseconds(header->pts);
+	}
+	else
+	{
+		auto now = steady_clock::now();
+		pts = now - si->startTime;
+	}
+
+	try
+	{
 		spa_data& d = b->buffer->datas[0];
-		if (d.type == SPA_DATA_MemPtr || d.type == SPA_DATA_MemFd) {
+		if (d.type == SPA_DATA_MemPtr || d.type == SPA_DATA_MemFd)
+		{
 			printf("Memory-mapped buffer info: size = %x, stride = %x, ptr = %p\n",
 			       d.chunk->size, d.chunk->stride, d.data);
 			assert(b->buffer->n_datas == 1);
 			auto f = std::make_unique<MemoryFrame>();
 			f->width = si->format.info.raw.size.width;
 			f->height = si->format.info.raw.size.height;
+			f->pts = pts;
 			f->format = spa2pixelFormat(si->format.info.raw.format);
 			f->memory = d.data;
 			f->stride = static_cast<size_t>(d.chunk->stride);
 			f->size = d.chunk->size;
 			f->offset = d.chunk->offset;
-			f->onFrameDone = [si, b]() {
+			f->onFrameDone = [si, b]()
+			{
 				pw_stream_queue_buffer(si->stream, b);
 			};
 			si->mainLoopInfo->streamCallbacks.pushMemoryFrame(std::move(f));
-		} else if (d.type == SPA_DATA_DmaBuf) {
+		}
+		else if (d.type == SPA_DATA_DmaBuf)
+		{
 			unsigned int planeCount = std::min(b->buffer->n_datas, 4u);
 			printf("DMA-BUF info: fd = %ld, size = %x, totalSize = %x, stride = %x, planeCount = %u, offset = %x\n",
 			       d.fd, d.chunk->size, d.maxsize, d.chunk->stride, planeCount, d.chunk->offset);
@@ -131,6 +153,7 @@ void processFrame(void* userData) noexcept
 			auto f = std::make_unique<DmaBufFrame>();
 			f->width = si->format.info.raw.size.width;
 			f->height = si->format.info.raw.size.height;
+			f->pts = pts;
 			f->drmFormat = spa2drmFormat(si->format.info.raw.format);
 			f->drmObject = {
 					.fd = static_cast<int>(b->buffer->datas[0].fd),
@@ -138,10 +161,12 @@ void processFrame(void* userData) noexcept
 					.modifier = static_cast<uint64_t>(si->format.info.raw.modifier),
 			};
 			f->planeCount = planeCount;
-			f->onFrameDone = [si, b]() {
+			f->onFrameDone = [si, b]()
+			{
 				pw_stream_queue_buffer(si->stream, b);
 			};
-			for (unsigned int l = 0; l < planeCount; ++l) {
+			for (unsigned int l = 0; l < planeCount; ++l)
+			{
 				auto& plane = f->planes[l];
 				spa_chunk& chunk = *b->buffer->datas[l].chunk;
 				plane.offset = chunk.offset;
@@ -173,6 +198,7 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 		{
 			quit(si, std::current_exception());
 		}
+		si->startTime = steady_clock::now();
 	}
 	else if (old == PW_STREAM_STATE_STREAMING)
 	{
@@ -211,20 +237,28 @@ static void streamParamChanged(void* userdata, uint32_t paramID, const spa_pod* 
 	uint32_t bufferTypes = (1 << SPA_DATA_MemPtr);
 	if (modifier)
 		bufferTypes |= (1 << SPA_DATA_DmaBuf);
-	const spa_pod* params[2];
+	const spa_pod* params[3];
 	params[0] = static_cast<spa_pod*>(spa_pod_builder_add_object(&b,
-	                                                             SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
-	                                                             SPA_PARAM_META_type, SPA_POD_Id(SPA_META_Cursor),
-																 SPA_PARAM_META_size, SPA_POD_CHOICE_RANGE_Int(
-																		 CURSOR_META_SIZE(24, 24),
-																		 CURSOR_META_SIZE(1, 1),
-																		 CURSOR_META_SIZE(256, 256)
-																 )));
+			SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
+			SPA_PARAM_META_type, SPA_POD_Id(SPA_META_Cursor),
+			SPA_PARAM_META_size, SPA_POD_CHOICE_RANGE_Int(
+					CURSOR_META_SIZE(24, 24),
+					CURSOR_META_SIZE(1, 1),
+					CURSOR_META_SIZE(256, 256)
+			)
+	));
 	params[1] = static_cast<spa_pod*>(spa_pod_builder_add_object(&b,
-	                                                             SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
-																 SPA_PARAM_BUFFERS_buffers, SPA_POD_Int(16),
-	                                                             SPA_PARAM_BUFFERS_dataType, SPA_POD_CHOICE_FLAGS_Int(bufferTypes)));
-	assert(params[0] && params[1] && params[0]->size + params[1]->size<= sizeof(buffer));
+			SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
+			SPA_PARAM_META_type, SPA_POD_Id(SPA_META_Header),
+			SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_header))
+	));
+	params[2] = static_cast<spa_pod*>(spa_pod_builder_add_object(&b,
+			SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
+			SPA_PARAM_BUFFERS_buffers, SPA_POD_Int(16),
+			SPA_PARAM_BUFFERS_dataType, SPA_POD_CHOICE_FLAGS_Int(bufferTypes)
+	));
+	assert(params[0] && params[1] && params[2] && params[0]->size + params[1]->size + params[2]->size <= sizeof(buffer));
+
 	pw_stream_update_params(si->stream, params, sizeof(params)/sizeof(params[0]));
 }
 

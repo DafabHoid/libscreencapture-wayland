@@ -9,6 +9,7 @@
 #include "common.hpp"
 #include <cstdint>
 #include <exception>
+#include <chrono>
 #include <pipewire/pipewire.h>
 #include <spa/param/video/format.h>
 
@@ -63,6 +64,7 @@ struct StreamInfo
 	pw_stream *stream;
 	spa_video_info format;
 	bool haveDmaBuf;
+	std::chrono::time_point<std::chrono::steady_clock> startTime;
 	struct
 	{
 		int32_t x;

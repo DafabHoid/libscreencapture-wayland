@@ -8,7 +8,6 @@
 #include <cstdarg>
 #include <chrono>
 
-using namespace std::chrono_literals;
 using namespace std::chrono;
 
 extern "C" {
@@ -36,12 +35,6 @@ LibAVException::LibAVException(int errorCode, const char* messageFmtStr, ...)
 
 void FFmpegOutput::pushFrame(AVFrame_Heap frame)
 {
-	// assign a monotonically increasing PTS timestamp
-	// the timebase we use is microseconds, and PTS = 0 means the start of the stream
-	auto now = steady_clock::now();
-	auto fromStart = now - startTime;
-	frame->pts = duration_cast<microseconds>(fromStart).count();
-
 	scaler->enqueueFrame(std::move(frame));
 }
 
@@ -53,6 +46,7 @@ AVFrame* wrapInAVFrame(std::unique_ptr<MemoryFrame> frame) noexcept
 	f->format = pixelFormat2AV(frame->format);
 	f->data[0] = static_cast<uint8_t*>(frame->memory) + frame->offset;
 	f->linesize[0] = frame->stride;
+	f->pts = duration_cast<microseconds>(frame->pts).count();
 
 	auto frameDeleter = [](void* u, uint8_t*)
 	{
@@ -90,6 +84,7 @@ AVFrame* wrapInAVFrame(std::unique_ptr<DmaBufFrame> frame) noexcept
 	f->data[0] = reinterpret_cast<uint8_t*>(d);
 	f->width = frame->width;
 	f->height = frame->height;
+	f->pts = duration_cast<microseconds>(frame->pts).count();
 
 	// make sure reference counting works and the frame is deleted when no longer needed
 	auto frameDeleter = [](void* userData, uint8_t* bufData)
@@ -140,8 +135,6 @@ FFmpegOutput::FFmpegOutput(Rect sourceDimensions, PixelFormat sourcePixelFormat,
 	        {
 	            encoder->enqueueFrame(std::move(f));
 	        });
-
-	startTime = steady_clock::now();
 }
 
 FFmpegOutput::~FFmpegOutput() noexcept

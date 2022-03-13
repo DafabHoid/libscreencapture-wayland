@@ -12,7 +12,6 @@
 #include "VAAPIScaler.hpp"
 #include "Muxer.hpp"
 #include <memory>
-#include <chrono>
 
 namespace ffmpeg
 {
@@ -21,7 +20,6 @@ class FFmpegOutput
 {
 	AVBufferRef *drmDevice;
 	AVBufferRef *vaapiDevice;
-	std::chrono::time_point<std::chrono::steady_clock> startTime;
 	std::unique_ptr<VAAPIEncoder> encoder;
 	std::unique_ptr<VAAPIScaler> scaler;
 	std::unique_ptr<Muxer> muxer;
