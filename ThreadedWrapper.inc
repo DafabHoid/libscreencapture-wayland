@@ -17,6 +17,7 @@ void ThreadedWrapper<FrameProcessor, processMethod>::processFramesLoop() noexcep
 		{
 			auto frameOrEnd = queue.dequeue();
 			if (!std::holds_alternative<AVFrame_Heap>(frameOrEnd))
+				[[unlikely]]
 				break;
 			auto& frame = std::get<AVFrame_Heap>(frameOrEnd);
 			(wrapped.*processMethod)(*frame);
@@ -42,6 +43,7 @@ ThreadedWrapper<FrameProcessor, processMethod>::~ThreadedWrapper() noexcept
 	queue.signalEOF();
 	if (thread.joinable())
 	{
+		[[likely]]
 		thread.join();
 	}
 }

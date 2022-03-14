@@ -26,7 +26,7 @@ class BlockingRingbuffer
 public:
 	struct EndOfBuffer{};
 
-	void enqueue(T&& val)
+	void enqueue(T&& val) noexcept(noexcept(T(std::move(std::declval<T>()))))
 	{
 		{
 			std::lock_guard lock(mutex);
@@ -37,7 +37,7 @@ public:
 		readySignal.notify_all();
 	}
 
-	std::variant<T, EndOfBuffer> dequeue()
+	std::variant<T, EndOfBuffer> dequeue() noexcept
 	{
 		std::unique_lock lock(mutex);
 		while (ringBuffer.empty() && !eof)
