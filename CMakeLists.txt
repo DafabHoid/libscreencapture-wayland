@@ -91,7 +91,7 @@ endif() # ENABLE_FFMPEG_MODULE
 ######################################
 
 add_library(screencapture-wayland common.hpp include/c_common.h)
-target_link_options(screencapture-wayland PRIVATE -Wl,-z,now)
+target_link_options(screencapture-wayland PRIVATE -Wl,-z,now -Wl,-gc-sections)
 
 
 if(ENABLE_PORTAL_MODULE)
@@ -143,7 +143,7 @@ add_executable(screencapture main.cpp)
 target_link_libraries(screencapture PRIVATE screencapture-wayland)
 
 # enable Full RELRO
-target_link_options(screencapture PRIVATE -Wl,-z,now)
+target_link_options(screencapture PRIVATE -Wl,-z,now -Wl,-gc-sections -Wl,-as-needed)
 if(${STATIC_LIBSTDC++})
     target_link_options(screencapture PRIVATE -static-libstdc++)
 endif()

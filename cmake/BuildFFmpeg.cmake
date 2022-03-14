@@ -6,9 +6,11 @@
 
 # ffmpeg minimal build with static libraries
 include(ExternalProject)
-set(FFMPEG_OPTIMIZATION_FLAGS --disable-debug)
+message("Building minimal FFmpeg libraries")
 if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     set(FFMPEG_OPTIMIZATION_FLAGS --enable-debug=2 --disable-optimizations)
+else()
+    set(FFMPEG_OPTIMIZATION_FLAGS --disable-debug "--extra-cflags=-ffunction-sections")
 endif()
 find_program(MAKE REQUIRED NAMES gmake nmake make)
 ExternalProject_Add(ffmpeg
