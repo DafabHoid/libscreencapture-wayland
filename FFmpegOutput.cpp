@@ -35,7 +35,7 @@ LibAVException::LibAVException(int errorCode, const char* messageFmtStr, ...)
 
 void FFmpegOutput::pushFrame(AVFrame_Heap frame)
 {
-	scaler->enqueueFrame(std::move(frame));
+	scaler->processFrame(std::move(frame));
 }
 
 AVFrame* wrapInAVFrame(std::unique_ptr<MemoryFrame> frame) noexcept
@@ -121,19 +121,19 @@ FFmpegOutput::FFmpegOutput(Rect sourceDimensions, PixelFormat sourcePixelFormat,
 
 
 	constexpr unsigned int targetWidth = 1920, targetHeight = 1080;
-	encoder = std::make_unique<VAAPIEncoder>(targetWidth, targetHeight, vaapiDevice, [this](AVPacket& p)
+	encoder = std::make_unique<ThreadedVAAPIEncoder>(targetWidth, targetHeight, vaapiDevice, [this](AVPacket& p)
 	{
 		muxer->writePacket(p);
 	});
 
-	muxer = std::make_unique<Muxer>("rtsp://[::1]:8654/screen", "rtsp", encoder->getCodecContext());
+	muxer = std::make_unique<Muxer>("rtsp://[::1]:8654/screen", "rtsp", encoder->unwrap().getCodecContext());
 
-	scaler = std::make_unique<VAAPIScaler>(sourceDimensions,
+	scaler = std::make_unique<ThreadedVAAPIScaler>(sourceDimensions,
 	        pixelFormat2AV(sourcePixelFormat), Rect {targetWidth, targetHeight},
 	        drmDevice, vaapiDevice, withDRMPrime,
 	        [this] (AVFrame_Heap f)
 	        {
-	            encoder->enqueueFrame(std::move(f));
+	            encoder->processFrame(std::move(f));
 	        });
 }
 

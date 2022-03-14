@@ -124,7 +124,8 @@ if (ENABLE_FFMPEG_MODULE)
             FFmpegOutput.cpp FFmpegOutput.hpp
             VAAPIEncoder.cpp VAAPIEncoder.hpp
             VAAPIScaler.cpp VAAPIScaler.hpp
-            Muxer.cpp Muxer.hpp)
+            Muxer.cpp Muxer.hpp
+            ThreadedWrapper.inc ThreadedWrapper.hpp)
     target_link_libraries(screencapture-module-ffmpeg PUBLIC ${FFMPEG_LIBS} Threads::Threads)
     set_property(TARGET screencapture-module-ffmpeg PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
     if(${BUILD_FFMPEG})

@@ -124,15 +124,10 @@ VAAPIScaler::VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targe
 	{
 		throw LibAVException(ret, "Failed to configure filter graph");
 	}
-
-	scaleThread = std::thread([this] () { scaleFramesLoop(); });
 }
 
 VAAPIScaler::~VAAPIScaler() noexcept
 {
-	scaleQueue.signalEOF();
-	if (scaleThread.joinable())
-		scaleThread.join();
 	AVFilterContext* hardwareFrameFilter = avfilter_graph_get_filter(filterGraph, ("Parsed_"s + hardwareFrameFilterName + "_0").c_str());
 	if (hardwareFrameFilter)
 	{
@@ -167,41 +162,12 @@ void VAAPIScaler::scaleFrame(AVFrame& frame)
 	}
 }
 
-void VAAPIScaler::enqueueFrame(AVFrame_Heap frame)
-{
-	if (scaleThreadException)
-		std::rethrow_exception(scaleThreadException);
-	// fix for hwupload on intel graphics
-	if (frame->format == AV_PIX_FMT_BGRA)
-		frame->format = AV_PIX_FMT_BGR0;
-	scaleQueue.enqueue(std::move(frame));
 }
 
-std::variant<AVFrame_Heap, VAAPIScaler::EndOfQueue> VAAPIScaler::dequeueFrame()
-{
-	auto frameOrEnd = scaleQueue.dequeue();
-	if (std::holds_alternative<AVFrame_Heap>(frameOrEnd))
-		return std::move(std::get<AVFrame_Heap>(frameOrEnd));
-	return EndOfQueue{};
-}
+#include "ThreadedWrapper.inc"
 
-void VAAPIScaler::scaleFramesLoop()
+namespace ffmpeg
 {
-	try
-	{
-		while (true)
-		{
-			auto frameOrEnd = dequeueFrame();
-			if (std::holds_alternative<EndOfQueue>(frameOrEnd))
-				break;
-			auto& frame = std::get<AVFrame_Heap>(frameOrEnd);
-			scaleFrame(*frame);
-		}
-	}
-	catch (const std::exception& e)
-	{
-		scaleThreadException = std::current_exception();
-	}
-}
-
+// instantiate code for template
+template class ThreadedWrapper<VAAPIScaler, &VAAPIScaler::scaleFrame>;
 }

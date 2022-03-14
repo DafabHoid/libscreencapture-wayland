@@ -7,9 +7,8 @@
 #define SCREENCAPTURE_VAAPIENCODER_HPP
 
 #include "libavcommon.hpp"
-#include <thread>
-#include "BlockingRingbuffer.hpp"
 #include <functional>
+#include "ThreadedWrapper.hpp"
 extern "C"
 {
 #include <libavcodec/avcodec.h>
@@ -26,24 +25,22 @@ class VAAPIEncoder
 	AVCodecContext* codecContext;
 	AVPacket* encodedFrame;
 	EncodedCallback encodedCallback;
-	BlockingRingbuffer<AVFrame_Heap, 8> encodeQueue;
-	std::thread encodingThread;
-	std::exception_ptr encodingThreadException;
-	void encodeFramesLoop();
 
 public:
 	SCW_EXPORT VAAPIEncoder(unsigned int width, unsigned int height, AVBufferRef* hwDevice, EncodedCallback cb);
 	SCW_EXPORT ~VAAPIEncoder() noexcept;
-
-	SCW_EXPORT void enqueueFrame(AVFrame_Heap frame);
-	struct EndOfQueue {};
-	SCW_EXPORT std::variant<AVFrame_Heap, EndOfQueue> dequeueFrame();
 
 	SCW_EXPORT void encodeFrame(AVFrame& gpuFrame);
 
 	SCW_EXPORT const AVCodec* getCodec() const noexcept { return codec; }
 	SCW_EXPORT const AVCodecContext* getCodecContext() const noexcept { return codecContext; }
 };
+
+
+using ThreadedVAAPIEncoder = ThreadedWrapper<VAAPIEncoder, &VAAPIEncoder::encodeFrame>;
+
+// declare external instantiation for template
+extern template class ThreadedWrapper<VAAPIEncoder, &VAAPIEncoder::encodeFrame>;
 
 }
 

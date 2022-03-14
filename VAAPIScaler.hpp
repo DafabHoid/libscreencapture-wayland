@@ -7,8 +7,7 @@
 #define SCREENCAPTURE_VAAPISCALER_HPP
 
 #include "libavcommon.hpp"
-#include "BlockingRingbuffer.hpp"
-#include <thread>
+#include "ThreadedWrapper.hpp"
 
 extern "C"
 {
@@ -31,11 +30,6 @@ class VAAPIScaler
 	AVFilterContext* filterSinkContext;
 	const char* const hardwareFrameFilterName;
 	ScalingDoneCallback scalingDone;
-	BlockingRingbuffer<AVFrame_Heap, 8> scaleQueue;
-	std::thread scaleThread;
-	std::exception_ptr scaleThreadException;
-
-	void scaleFramesLoop();
 
 public:
 	/** Create a new VAAPIScaler with the given source and target dimensions.
@@ -51,24 +45,18 @@ public:
 
 	SCW_EXPORT ~VAAPIScaler() noexcept;
 
-	/** Add a frame into the scaling queue. It can be retrieved by dequeueFrame().
-	 * If the queue is full, the frame will by silently dropped.
-	 * This function is thread-safe. */
-	SCW_EXPORT void enqueueFrame(AVFrame_Heap frame);
-
-	struct EndOfQueue {};
-	/** Get a frame from the scaling queue. If the queue is empty, this will block until
-	 * a frame is added to the queue by enqueueFrame().
-	 * When the queue is EOF, return #EndOfQueue.
-	 * This function is thread-safe. */
-	SCW_EXPORT std::variant<AVFrame_Heap, EndOfQueue> dequeueFrame();
-
 	/** Scale a single frame.
 	 * After scaling, the given ScalingDoneCallback is called with the scaled frame.
 	 * Ownership of the frame is transferred to the callback.
 	 * This function is NOT thread-safe. */
 	SCW_EXPORT void scaleFrame(AVFrame& frame);
 };
+
+
+using ThreadedVAAPIScaler = ThreadedWrapper<VAAPIScaler, &VAAPIScaler::scaleFrame>;
+
+// declare external instantiation for template
+extern template class ThreadedWrapper<VAAPIScaler, &VAAPIScaler::scaleFrame>;
 
 }
 

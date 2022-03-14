@@ -46,34 +46,12 @@ VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVBufferRef*
 	r = avcodec_open2(codecContext, codec, nullptr);
 	if (r)
 		throw LibAVException(r, "Opening encoder failed");
-
-	encodingThread = std::thread([this] () { encodeFramesLoop(); });
 }
 
 VAAPIEncoder::~VAAPIEncoder() noexcept
 {
-	encodeQueue.signalEOF();
-	if (encodingThread.joinable())
-	{
-		encodingThread.join();
-	}
 	av_packet_free(&encodedFrame);
 	avcodec_free_context(&codecContext);
-}
-
-void VAAPIEncoder::enqueueFrame(AVFrame_Heap frame)
-{
-	if (encodingThreadException)
-		std::rethrow_exception(encodingThreadException);
-	encodeQueue.enqueue(std::move(frame));
-}
-
-std::variant<AVFrame_Heap, VAAPIEncoder::EndOfQueue> VAAPIEncoder::dequeueFrame()
-{
-	auto frameOrEnd = encodeQueue.dequeue();
-	if (std::holds_alternative<AVFrame_Heap>(frameOrEnd))
-		return std::move(std::get<AVFrame_Heap>(frameOrEnd));
-	return EndOfQueue{};
 }
 
 void VAAPIEncoder::encodeFrame(AVFrame& gpuFrame)
@@ -95,23 +73,12 @@ void VAAPIEncoder::encodeFrame(AVFrame& gpuFrame)
 	}
 }
 
-void VAAPIEncoder::encodeFramesLoop()
-{
-	try
-	{
-		while (true)
-		{
-			auto frameOrEnd = dequeueFrame();
-			if (std::holds_alternative<EndOfQueue>(frameOrEnd))
-				break;
-			auto& frame = std::get<AVFrame_Heap>(frameOrEnd);
-			encodeFrame(*frame);
-		}
-	}
-	catch (const std::exception& e)
-	{
-		encodingThreadException = std::current_exception();
-	}
 }
 
+#include "ThreadedWrapper.inc"
+
+namespace ffmpeg
+{
+// instantiate code for template
+template class ThreadedWrapper<VAAPIEncoder, &VAAPIEncoder::encodeFrame>;
 }
