@@ -6,19 +6,16 @@
 #ifndef SCREENCAPTURE_BLOCKINGRINGBUFFER_HPP
 #define SCREENCAPTURE_BLOCKINGRINGBUFFER_HPP
 
-#include <queue>
-#include <list>
+#include <vector>
 #include <mutex>
-#include <chrono>
 #include <condition_variable>
 #include <variant>
-
-using namespace std::chrono_literals;
 
 template <typename T, size_t Capacity>
 class BlockingRingbuffer
 {
-	std::queue<T, std::list<T>> ringBuffer;
+	std::vector<T> ringBuffer;
+	size_t tailIndex = 0;
 	std::mutex mutex;
 	std::condition_variable readySignal;
 	bool eof = false;
@@ -26,13 +23,21 @@ class BlockingRingbuffer
 public:
 	struct EndOfBuffer{};
 
+	size_t size() const noexcept
+	{
+		return ringBuffer.size() - tailIndex;
+	}
+
 	void enqueue(T&& val) noexcept(noexcept(T(std::move(std::declval<T>()))))
 	{
 		{
 			std::lock_guard lock(mutex);
-			if (ringBuffer.size() >= Capacity)
-				return;
-			ringBuffer.push(std::move(val));
+			ringBuffer.push_back(std::move(val));
+			if (size() > Capacity)
+			{
+				T discard = std::move(ringBuffer[tailIndex]);
+				++tailIndex;
+			}
 		}
 		readySignal.notify_all();
 	}
@@ -40,15 +45,21 @@ public:
 	std::variant<T, EndOfBuffer> dequeue() noexcept
 	{
 		std::unique_lock lock(mutex);
-		while (ringBuffer.empty() && !eof)
+		while (size() == 0 && !eof)
 		{
-			readySignal.wait_for(lock, 1s);
+			readySignal.wait(lock);
 		}
 		if (eof)
+			[[unlikely]]
 			return EndOfBuffer{};
-		auto v = std::move(ringBuffer.front());
-		ringBuffer.pop();
-		return v;
+		T val = std::move(ringBuffer[tailIndex]);
+		++tailIndex;
+		if (tailIndex > std::max(Capacity, size_t(128)))
+		{
+			ringBuffer.erase(ringBuffer.begin(), ringBuffer.begin() + tailIndex);
+			tailIndex = 0;
+		}
+		return val;
 	}
 
 	void signalEOF() noexcept
