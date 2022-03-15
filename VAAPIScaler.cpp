@@ -126,18 +126,34 @@ VAAPIScaler::VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targe
 	}
 }
 
+VAAPIScaler::VAAPIScaler(VAAPIScaler&& o) noexcept
+: filterGraph(o.filterGraph),
+  filterSrcContext(o.filterSrcContext),
+  filterSinkContext(o.filterSinkContext),
+  hardwareFrameFilterName(o.hardwareFrameFilterName),
+  scalingDone(std::move(o.scalingDone))
+{
+	o.filterSrcContext = nullptr;
+	o.filterSinkContext = nullptr;
+	o.filterGraph = nullptr;
+}
+
 VAAPIScaler::~VAAPIScaler() noexcept
 {
-	AVFilterContext* hardwareFrameFilter = avfilter_graph_get_filter(filterGraph, ("Parsed_"s + hardwareFrameFilterName + "_0").c_str());
-	if (hardwareFrameFilter)
+	if (filterGraph)
 	{
-		av_buffer_unref(&hardwareFrameFilter->hw_device_ctx);
+		AVFilterContext* hardwareFrameFilter =
+				avfilter_graph_get_filter(filterGraph,("Parsed_"s + hardwareFrameFilterName + "_0").c_str());
+		if (hardwareFrameFilter)
+		{
+			av_buffer_unref(&hardwareFrameFilter->hw_device_ctx);
+		}
+		if (filterSrcContext)
+		{
+			av_buffer_unref(&filterSrcContext->hw_device_ctx);
+		}
+		avfilter_graph_free(&filterGraph);
 	}
-	if (filterSrcContext)
-	{
-		av_buffer_unref(&filterSrcContext->hw_device_ctx);
-	}
-	avfilter_graph_free(&filterGraph);
 }
 
 void VAAPIScaler::scaleFrame(AVFrame& frame)

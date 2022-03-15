@@ -28,6 +28,8 @@ class VAAPIEncoder
 
 public:
 	SCW_EXPORT VAAPIEncoder(unsigned int width, unsigned int height, AVBufferRef* hwDevice, EncodedCallback cb);
+	SCW_EXPORT VAAPIEncoder(VAAPIEncoder&&) noexcept;
+	           VAAPIEncoder(const VAAPIEncoder&) = delete;
 	SCW_EXPORT ~VAAPIEncoder() noexcept;
 
 	SCW_EXPORT void encodeFrame(AVFrame& gpuFrame);

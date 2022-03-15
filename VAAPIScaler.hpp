@@ -43,6 +43,8 @@ public:
 	SCW_EXPORT VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targetSize,
 	            AVBufferRef* drmDevice, AVBufferRef* vaapiDevice, bool inputIsDRMPrime, ScalingDoneCallback cb);
 
+	SCW_EXPORT VAAPIScaler(VAAPIScaler&&) noexcept;
+	           VAAPIScaler(const VAAPIScaler&) = delete;
 	SCW_EXPORT ~VAAPIScaler() noexcept;
 
 	/** Scale a single frame.

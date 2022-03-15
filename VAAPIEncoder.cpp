@@ -48,6 +48,16 @@ VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVBufferRef*
 		throw LibAVException(r, "Opening encoder failed");
 }
 
+VAAPIEncoder::VAAPIEncoder(VAAPIEncoder&& o) noexcept
+: codec(o.codec),
+  codecContext(o.codecContext),
+  encodedFrame(o.encodedFrame),
+  encodedCallback(std::move(o.encodedCallback))
+{
+	o.encodedFrame = nullptr;
+	o.codecContext = nullptr;
+}
+
 VAAPIEncoder::~VAAPIEncoder() noexcept
 {
 	av_packet_free(&encodedFrame);
