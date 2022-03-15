@@ -20,9 +20,9 @@ class FFmpegOutput
 {
 	AVBufferRef *drmDevice;
 	AVBufferRef *vaapiDevice;
+	std::unique_ptr<Muxer> muxer;
 	std::unique_ptr<ThreadedVAAPIEncoder> encoder;
 	std::unique_ptr<ThreadedVAAPIScaler> scaler;
-	std::unique_ptr<Muxer> muxer;
 
 public:
 	SCW_EXPORT FFmpegOutput(Rect sourceDimensions, PixelFormat sourcePixelFormat, bool withDRMPrime);
