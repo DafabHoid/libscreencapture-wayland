@@ -166,7 +166,7 @@ void VAAPIScaler::scaleFrame(AVFrame& frame)
 	{
 		auto gpuFrame = AVFrame_Heap(av_frame_alloc());
 		err = av_buffersink_get_frame(filterSinkContext, gpuFrame.get());
-		if (err == AVERROR(EAGAIN) || err == AVERROR(ENOMEM))
+		if (err == AVERROR(EAGAIN))
 		{
 			break;
 		}

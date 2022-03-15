@@ -20,7 +20,7 @@ using FrameProcessMethod = void (FrameProcessor::*)(AVFrame&);
 template <typename FrameProcessor, FrameProcessMethod<FrameProcessor> processMethod>
 class ThreadedWrapper
 {
-	BlockingRingbuffer<AVFrame_Heap, 8> queue;
+	BlockingRingbuffer<AVFrame_Heap, 4> queue;
 	std::thread thread;
 	std::exception_ptr threadException;
 
