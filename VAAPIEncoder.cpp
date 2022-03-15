@@ -37,8 +37,8 @@ VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVBufferRef*
 	codecContext->time_base = AVRational {1, std::chrono::duration_cast<std::chrono::microseconds>(1s).count()};
 	codecContext->sample_aspect_ratio = AVRational {1, 1};
 	codecContext->color_range = AVCOL_RANGE_JPEG;
-	codecContext->global_quality = 25;
-	codecContext->keyint_min = 10;
+	codecContext->gop_size = 30;
+	codecContext->bit_rate = 4*1000*1000;
 	codecContext->pix_fmt = AV_PIX_FMT_VAAPI;
 	codecContext->flags |= AV_CODEC_FLAG_GLOBAL_HEADER; // provide codecContext->extradata for muxer instead of inside the packets
 	codecContext->hw_frames_ctx = hwFramesContext;
