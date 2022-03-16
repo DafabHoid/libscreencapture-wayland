@@ -14,15 +14,19 @@
 namespace ffmpeg
 {
 
-template <typename FrameProcessor>
-using FrameProcessMethod = void (FrameProcessor::*)(AVFrame&);
+template <typename OutputType>
+using FrameProcessedCallback = std::function<void(OutputType)>;
 
-template <typename FrameProcessor, FrameProcessMethod<FrameProcessor> processMethod>
+template <typename FrameProcessor, typename OutputType>
+using FrameProcessMethod = void (FrameProcessor::*)(AVFrame&, const FrameProcessedCallback<OutputType>&);
+
+template <typename FrameProcessor, typename OutputType, FrameProcessMethod<FrameProcessor, OutputType> processMethod>
 class ThreadedWrapper
 {
 	BlockingRingbuffer<AVFrame_Heap, 4> queue;
 	std::thread thread;
 	std::exception_ptr threadException;
+	FrameProcessedCallback<OutputType> frameProcessedCallback;
 
 	FrameProcessor wrapped;
 
@@ -42,6 +46,8 @@ public:
 
 	/** Signal the thread to stop, wait for it to terminate and then destroy the wrapped object. */
 	SCW_EXPORT ~ThreadedWrapper() noexcept;
+
+	SCW_EXPORT void setFrameProcessedCallback(FrameProcessedCallback<OutputType> cb) noexcept;
 
 	/** Get access to the wrapped object. */
 	SCW_EXPORT FrameProcessor& unwrap() noexcept { return wrapped; }

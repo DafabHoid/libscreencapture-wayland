@@ -121,7 +121,8 @@ FFmpegOutput::FFmpegOutput(Rect sourceDimensions, PixelFormat sourcePixelFormat,
 
 
 	constexpr unsigned int targetWidth = 1920, targetHeight = 1080;
-	encoder = std::make_unique<ThreadedVAAPIEncoder>(targetWidth, targetHeight, vaapiDevice, [this](AVPacket& p)
+	encoder = std::make_unique<ThreadedVAAPIEncoder>(targetWidth, targetHeight, vaapiDevice);
+	encoder->setFrameProcessedCallback([this](AVPacket& p)
 	{
 		muxer->writePacket(p);
 	});
@@ -130,8 +131,8 @@ FFmpegOutput::FFmpegOutput(Rect sourceDimensions, PixelFormat sourcePixelFormat,
 
 	scaler = std::make_unique<ThreadedVAAPIScaler>(sourceDimensions,
 	        pixelFormat2AV(sourcePixelFormat), Rect {targetWidth, targetHeight},
-	        drmDevice, vaapiDevice, withDRMPrime,
-	        [this] (AVFrame_Heap f)
+	        drmDevice, vaapiDevice, withDRMPrime);
+	scaler->setFrameProcessedCallback([this] (AVFrame_Heap f)
 	        {
 	            encoder->processFrame(std::move(f));
 	        });

@@ -12,9 +12,8 @@ using namespace std::chrono_literals;
 namespace ffmpeg
 {
 
-VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVBufferRef* hwDevice, EncodedCallback cb)
-: encodedFrame(av_packet_alloc()),
-  encodedCallback(std::move(cb))
+VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVBufferRef* hwDevice)
+: encodedFrame(av_packet_alloc())
 {
 	codec = avcodec_find_encoder_by_name("h264_vaapi");
 	if (codec == nullptr)
@@ -51,8 +50,7 @@ VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVBufferRef*
 VAAPIEncoder::VAAPIEncoder(VAAPIEncoder&& o) noexcept
 : codec(o.codec),
   codecContext(o.codecContext),
-  encodedFrame(o.encodedFrame),
-  encodedCallback(std::move(o.encodedCallback))
+  encodedFrame(o.encodedFrame)
 {
 	o.encodedFrame = nullptr;
 	o.codecContext = nullptr;
@@ -64,7 +62,7 @@ VAAPIEncoder::~VAAPIEncoder() noexcept
 	avcodec_free_context(&codecContext);
 }
 
-void VAAPIEncoder::encodeFrame(AVFrame& gpuFrame)
+void VAAPIEncoder::encodeFrame(AVFrame& gpuFrame, const EncodedCallback& encodedCallback)
 {
 	int err = avcodec_send_frame(codecContext, &gpuFrame);
 	if (err < 0)
@@ -90,5 +88,5 @@ void VAAPIEncoder::encodeFrame(AVFrame& gpuFrame)
 namespace ffmpeg
 {
 // instantiate code for template
-template class ThreadedWrapper<VAAPIEncoder, &VAAPIEncoder::encodeFrame>;
+template class ThreadedWrapper<VAAPIEncoder, AVPacket&, &VAAPIEncoder::encodeFrame>;
 }

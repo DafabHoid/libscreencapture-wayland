@@ -23,11 +23,10 @@ namespace ffmpeg
 {
 
 VAAPIScaler::VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targetSize,
-                         AVBufferRef* drmDevice, AVBufferRef* vaapiDevice, bool inputIsDRMPrime, ScalingDoneCallback cb)
+                         AVBufferRef* drmDevice, AVBufferRef* vaapiDevice, bool inputIsDRMPrime)
 : filterGraph(avfilter_graph_alloc()),
   // DRM PRIME frames can be directly mapped to VAAPI. Memory frames have to be copied to the GPU first.
-  hardwareFrameFilterName(inputIsDRMPrime ? "hwmap" : "hwupload"),
-  scalingDone(std::move(cb))
+  hardwareFrameFilterName(inputIsDRMPrime ? "hwmap" : "hwupload")
 {
 	const AVFilter* buffersrc = avfilter_get_by_name("buffer");
 	const AVFilter* buffersink = avfilter_get_by_name("buffersink");
@@ -130,8 +129,7 @@ VAAPIScaler::VAAPIScaler(VAAPIScaler&& o) noexcept
 : filterGraph(o.filterGraph),
   filterSrcContext(o.filterSrcContext),
   filterSinkContext(o.filterSinkContext),
-  hardwareFrameFilterName(o.hardwareFrameFilterName),
-  scalingDone(std::move(o.scalingDone))
+  hardwareFrameFilterName(o.hardwareFrameFilterName)
 {
 	o.filterSrcContext = nullptr;
 	o.filterSinkContext = nullptr;
@@ -156,7 +154,7 @@ VAAPIScaler::~VAAPIScaler() noexcept
 	}
 }
 
-void VAAPIScaler::scaleFrame(AVFrame& frame)
+void VAAPIScaler::scaleFrame(AVFrame& frame, const ScalingDoneCallback& scalingDone)
 {
 	int err = av_buffersrc_add_frame_flags(filterSrcContext, &frame, 0);
 	if (err)
@@ -185,5 +183,5 @@ void VAAPIScaler::scaleFrame(AVFrame& frame)
 namespace ffmpeg
 {
 // instantiate code for template
-template class ThreadedWrapper<VAAPIScaler, &VAAPIScaler::scaleFrame>;
+template class ThreadedWrapper<VAAPIScaler, AVFrame_Heap, &VAAPIScaler::scaleFrame>;
 }
