@@ -33,6 +33,24 @@ LibAVException::LibAVException(int errorCode, const char* messageFmtStr, ...)
 	dumpStackTrace();
 }
 
+FFmpegOutput::FFmpegOutput(std::unique_ptr<ThreadedVAAPIScaler> scaler,
+                           std::unique_ptr<ThreadedVAAPIEncoder> encoder,
+                           std::unique_ptr<Muxer> muxer) noexcept
+: muxer(std::move(muxer)),
+  encoder(std::move(encoder)),
+  scaler(std::move(scaler))
+{
+	this->encoder->setFrameProcessedCallback([this](AVPacket& p)
+	{
+		this->muxer->writePacket(p);
+	});
+
+	this->scaler->setFrameProcessedCallback([this](AVFrame_Heap f)
+	{
+		this->encoder->processFrame(std::move(f));
+	});
+}
+
 void FFmpegOutput::pushFrame(AVFrame_Heap frame)
 {
 	scaler->processFrame(std::move(frame));
@@ -165,16 +183,6 @@ FFmpegOutput FFmpegOutput::Builder::build()
 		auto scaler = std::make_unique<ThreadedVAAPIScaler>(sourceSize,
 				pixelFormat2AV(sourceFormat), targetSize,
 				drmDevice, vaapiDevice, isSourceDrmPrime);
-
-		encoder->setFrameProcessedCallback([&muxer = *muxer.get()](AVPacket& p)
-		{
-			muxer.writePacket(p);
-		});
-
-		scaler->setFrameProcessedCallback([&encoder = *encoder.get()] (AVFrame_Heap f)
-		{
-			encoder.processFrame(std::move(f));
-		});
 
 		av_buffer_unref(&vaapiDevice);
 		av_buffer_unref(&drmDevice);

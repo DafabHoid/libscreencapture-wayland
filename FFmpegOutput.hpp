@@ -24,13 +24,10 @@ class FFmpegOutput
 	std::unique_ptr<ThreadedVAAPIScaler> scaler;
 
 public:
-	SCW_EXPORT FFmpegOutput(std::unique_ptr<ThreadedVAAPIScaler> scaler,
+	SCW_EXPORT FFmpegOutput(
+			std::unique_ptr<ThreadedVAAPIScaler> scaler,
 	        std::unique_ptr<ThreadedVAAPIEncoder> encoder,
-	        std::unique_ptr<Muxer> muxer)
-	: muxer(std::move(muxer)),
-	  encoder(std::move(encoder)),
-	  scaler(std::move(scaler))
-	{}
+	        std::unique_ptr<Muxer> muxer) noexcept;
 
 	SCW_EXPORT void pushFrame(AVFrame_Heap frame);
 
