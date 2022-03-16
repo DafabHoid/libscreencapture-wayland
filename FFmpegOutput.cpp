@@ -40,14 +40,14 @@ FFmpegOutput::FFmpegOutput(std::unique_ptr<ThreadedVAAPIScaler> scaler,
   encoder(std::move(encoder)),
   scaler(std::move(scaler))
 {
-	this->encoder->setFrameProcessedCallback([this](AVPacket& p)
+	this->encoder->setFrameProcessedCallback([muxer = this->muxer.get()](AVPacket& p)
 	{
-		this->muxer->writePacket(p);
+		muxer->writePacket(p);
 	});
 
-	this->scaler->setFrameProcessedCallback([this](AVFrame_Heap f)
+	this->scaler->setFrameProcessedCallback([encoder = this->encoder.get()](AVFrame_Heap f)
 	{
-		this->encoder->processFrame(std::move(f));
+		encoder->processFrame(std::move(f));
 	});
 }
 
