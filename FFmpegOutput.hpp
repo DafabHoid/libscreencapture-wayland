@@ -11,6 +11,7 @@
 #include "VAAPIEncoder.hpp"
 #include "VAAPIScaler.hpp"
 #include "Muxer.hpp"
+#include <string>
 #include <memory>
 
 namespace ffmpeg
@@ -18,18 +19,68 @@ namespace ffmpeg
 
 class FFmpegOutput
 {
-	AVBufferRef *drmDevice;
-	AVBufferRef *vaapiDevice;
 	std::unique_ptr<Muxer> muxer;
 	std::unique_ptr<ThreadedVAAPIEncoder> encoder;
 	std::unique_ptr<ThreadedVAAPIScaler> scaler;
 
 public:
-	SCW_EXPORT FFmpegOutput(Rect sourceDimensions, PixelFormat sourcePixelFormat, bool withDRMPrime);
-
-	SCW_EXPORT ~FFmpegOutput() noexcept;
+	SCW_EXPORT FFmpegOutput(std::unique_ptr<ThreadedVAAPIScaler> scaler,
+	        std::unique_ptr<ThreadedVAAPIEncoder> encoder,
+	        std::unique_ptr<Muxer> muxer)
+	: muxer(std::move(muxer)),
+	  encoder(std::move(encoder)),
+	  scaler(std::move(scaler))
+	{}
 
 	SCW_EXPORT void pushFrame(AVFrame_Heap frame);
+
+
+	class Builder
+	{
+		Rect sourceSize;
+		PixelFormat sourceFormat;
+		bool isSourceDrmPrime;
+		Rect targetSize;
+		AVDictionary* codecOptions;
+		std::string outputFormat;
+		std::string outputPath;
+		std::string hwDevicePath;
+
+	public:
+		SCW_EXPORT Builder(Rect sourceSize, PixelFormat sourceFormat, bool isDrmPrime) noexcept;
+
+		SCW_EXPORT Builder& withHWDevice(std::string devicePath) noexcept
+		{
+			hwDevicePath = std::move(devicePath);
+			return *this;
+		}
+
+		SCW_EXPORT Builder& withScaling(Rect scaledSize) noexcept
+		{
+			targetSize = scaledSize;
+			return *this;
+		}
+
+		SCW_EXPORT Builder& withCodecOptions(AVDictionary* options) noexcept
+		{
+			codecOptions = options;
+			return *this;
+		}
+
+		SCW_EXPORT Builder& withOutputFormat(std::string format) noexcept
+		{
+			outputFormat = std::move(format);
+			return *this;
+		}
+
+		SCW_EXPORT Builder& withOutputPath(std::string path) noexcept
+		{
+			outputPath = std::move(path);
+			return *this;
+		}
+
+		SCW_EXPORT FFmpegOutput build();
+	};
 };
 
 }

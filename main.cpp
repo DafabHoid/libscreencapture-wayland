@@ -33,7 +33,12 @@ int main(int argc, char** argv)
 			public:
 				void streamConnected(pw::Rect dimensions, pw::PixelFormat format, bool isDmaBuf) override
 				{
-					ffmpegOutput = std::make_unique<ffmpeg::FFmpegOutput>(dimensions, format, isDmaBuf);
+					ffmpeg::FFmpegOutput::Builder builder(dimensions, format, isDmaBuf);
+					builder
+						.withHWDevice("/dev/dri/renderD129")
+						.withOutputFormat("rtsp")
+						.withOutputPath("rtsp://[::1]:8654/screen");
+					ffmpegOutput = std::make_unique<ffmpeg::FFmpegOutput>(builder.build());
 				}
 				void streamDisconnected() override
 				{

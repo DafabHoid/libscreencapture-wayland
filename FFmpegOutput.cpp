@@ -98,9 +98,7 @@ AVFrame* wrapInAVFrame(std::unique_ptr<DmaBufFrame> frame) noexcept
 	return f;
 }
 
-FFmpegOutput::FFmpegOutput(Rect sourceDimensions, PixelFormat sourcePixelFormat, bool withDRMPrime)
-: drmDevice{},
-  vaapiDevice{}
+static void initFFmpeg() noexcept
 {
 #ifndef NDEBUG
 	av_log_set_level(AV_LOG_VERBOSE);
@@ -111,38 +109,83 @@ FFmpegOutput::FFmpegOutput(Rect sourceDimensions, PixelFormat sourcePixelFormat,
 	avcodec_register_all();
 #endif
 
-	r = av_hwdevice_ctx_create(&drmDevice, AV_HWDEVICE_TYPE_DRM, "/dev/dri/renderD129", nullptr, 0);
-	if (r)
-		throw LibAVException(r, "Opening the DRM node failed");
-
-	r = av_hwdevice_ctx_create_derived(&vaapiDevice, AV_HWDEVICE_TYPE_VAAPI, drmDevice, 0);
-	if (r < 0)
-		throw LibAVException(r, "Creating a VAAPI device from DRM node failed");
-
-
-	constexpr unsigned int targetWidth = 1920, targetHeight = 1080;
-	encoder = std::make_unique<ThreadedVAAPIEncoder>(targetWidth, targetHeight, vaapiDevice);
-	encoder->setFrameProcessedCallback([this](AVPacket& p)
-	{
-		muxer->writePacket(p);
-	});
-
-	muxer = std::make_unique<Muxer>("rtsp://[::1]:8654/screen", "rtsp", encoder->unwrap().getCodecContext());
-
-	scaler = std::make_unique<ThreadedVAAPIScaler>(sourceDimensions,
-	        pixelFormat2AV(sourcePixelFormat), Rect {targetWidth, targetHeight},
-	        drmDevice, vaapiDevice, withDRMPrime);
-	scaler->setFrameProcessedCallback([this] (AVFrame_Heap f)
-	        {
-	            encoder->processFrame(std::move(f));
-	        });
 }
 
-FFmpegOutput::~FFmpegOutput() noexcept
+FFmpegOutput::Builder::Builder(Rect sourceSize, PixelFormat sourceFormat, bool isDrmPrime) noexcept
+: sourceSize(sourceSize),
+  sourceFormat(sourceFormat),
+  isSourceDrmPrime(isDrmPrime),
+  targetSize(sourceSize),
+  codecOptions{}
 {
-	av_buffer_unref(&vaapiDevice);
-	av_buffer_unref(&drmDevice);
-	// scaler, encoder and muxer are implicitly stopped and destroyed here
+}
+
+FFmpegOutput FFmpegOutput::Builder::build()
+{
+	if (sourceSize.w == 0 || sourceSize.h == 0)
+	{
+		throw LibAVException(AVERROR(EINVAL),
+		                     "Source frame dimensions must not be zero, got %ux%u", sourceSize.w, sourceSize.h);
+	}
+	if (targetSize.w == 0 || targetSize.h == 0)
+	{
+		throw LibAVException(AVERROR(EINVAL),
+		                     "Scaled frame dimensions must not be zero, got %ux%u", targetSize.w, targetSize.h);
+	}
+	if (outputFormat.empty() && outputPath.empty())
+	{
+		throw LibAVException(AVERROR(EINVAL), "Neither output format nor output path specified");
+	}
+	if (hwDevicePath.empty())
+	{
+		throw LibAVException(AVERROR(EINVAL), "No hardware device path specified");
+	}
+
+	initFFmpeg();
+
+	int r;
+	AVBufferRef* drmDevice {};
+	AVBufferRef* vaapiDevice {};
+
+	try
+	{
+		r = av_hwdevice_ctx_create(&drmDevice, AV_HWDEVICE_TYPE_DRM, hwDevicePath.c_str(), nullptr, 0);
+		if (r)
+			throw LibAVException(r, "Opening the DRM node %s failed", hwDevicePath.c_str());
+
+		r = av_hwdevice_ctx_create_derived(&vaapiDevice, AV_HWDEVICE_TYPE_VAAPI, drmDevice, 0);
+		if (r < 0)
+			throw LibAVException(r, "Creating a VAAPI device from DRM node failed");
+
+		auto encoder = std::make_unique<ThreadedVAAPIEncoder>(targetSize.w, targetSize.h, vaapiDevice);
+
+		auto muxer = std::make_unique<Muxer>(outputPath,
+				outputFormat, encoder->unwrap().getCodecContext());
+
+		auto scaler = std::make_unique<ThreadedVAAPIScaler>(sourceSize,
+				pixelFormat2AV(sourceFormat), targetSize,
+				drmDevice, vaapiDevice, isSourceDrmPrime);
+
+		encoder->setFrameProcessedCallback([&muxer = *muxer.get()](AVPacket& p)
+		{
+			muxer.writePacket(p);
+		});
+
+		scaler->setFrameProcessedCallback([&encoder = *encoder.get()] (AVFrame_Heap f)
+		{
+			encoder.processFrame(std::move(f));
+		});
+
+		av_buffer_unref(&vaapiDevice);
+		av_buffer_unref(&drmDevice);
+		return FFmpegOutput(std::move(scaler), std::move(encoder), std::move(muxer));
+	}
+	catch (...)
+	{
+		av_buffer_unref(&vaapiDevice);
+		av_buffer_unref(&drmDevice);
+		throw;
+	}
 }
 
 }
