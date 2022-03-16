@@ -8,8 +8,8 @@
 namespace ffmpeg
 {
 
-template <typename FrameProcessor, typename OutputType, FrameProcessMethod<FrameProcessor, OutputType> processMethod>
-void ThreadedWrapper<FrameProcessor, OutputType, processMethod>::processFramesLoop() noexcept
+template <typename FrameProcessor>
+void ThreadedWrapper<FrameProcessor>::processFramesLoop() noexcept
 {
 	try
 	{
@@ -20,7 +20,7 @@ void ThreadedWrapper<FrameProcessor, OutputType, processMethod>::processFramesLo
 				[[unlikely]]
 				break;
 			auto& frame = std::get<AVFrame_Heap>(frameOrEnd);
-			(wrapped.*processMethod)(*frame, frameProcessedCallback);
+			wrapped.processFrame(*frame, frameProcessedCallback);
 		}
 	}
 	catch (const std::exception& e)
@@ -30,15 +30,15 @@ void ThreadedWrapper<FrameProcessor, OutputType, processMethod>::processFramesLo
 }
 
 
-template <typename FrameProcessor, typename OutputType, FrameProcessMethod<FrameProcessor, OutputType> processMethod>
-void ThreadedWrapper<FrameProcessor, OutputType, processMethod>::init()
+template <typename FrameProcessor>
+void ThreadedWrapper<FrameProcessor>::init()
 {
 	thread = std::thread([this] () { processFramesLoop(); });
 }
 
 
-template <typename FrameProcessor, typename OutputType, FrameProcessMethod<FrameProcessor, OutputType> processMethod>
-ThreadedWrapper<FrameProcessor, OutputType, processMethod>::~ThreadedWrapper() noexcept
+template <typename FrameProcessor>
+ThreadedWrapper<FrameProcessor>::~ThreadedWrapper() noexcept
 {
 	queue.signalEOF();
 	if (thread.joinable())
@@ -49,8 +49,8 @@ ThreadedWrapper<FrameProcessor, OutputType, processMethod>::~ThreadedWrapper() n
 }
 
 
-template <typename FrameProcessor, typename OutputType, FrameProcessMethod<FrameProcessor, OutputType> processMethod>
-void ThreadedWrapper<FrameProcessor, OutputType, processMethod>::processFrame(AVFrame_Heap frame)
+template <typename FrameProcessor>
+void ThreadedWrapper<FrameProcessor>::processFrame(AVFrame_Heap frame)
 {
 	if (threadException)
 		std::rethrow_exception(threadException);
@@ -58,9 +58,9 @@ void ThreadedWrapper<FrameProcessor, OutputType, processMethod>::processFrame(AV
 }
 
 
-template <typename FrameProcessor, typename OutputType, FrameProcessMethod<FrameProcessor, OutputType> processMethod>
-void ThreadedWrapper<FrameProcessor, OutputType, processMethod>::setFrameProcessedCallback(
-		FrameProcessedCallback <OutputType> cb) noexcept
+template <typename FrameProcessor>
+void ThreadedWrapper<FrameProcessor>::setFrameProcessedCallback(
+		FrameProcessedCallback cb) noexcept
 {
 	frameProcessedCallback = std::move(cb);
 }

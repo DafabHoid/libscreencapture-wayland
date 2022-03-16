@@ -18,8 +18,6 @@ extern "C"
 namespace ffmpeg
 {
 
-using ScalingDoneCallback = std::function<void(AVFrame_Heap)>;
-
 /** Upload and scale frames on the GPU using VAAPI.
  * Frames are converted to the NV12 pixel format during this process.
  * Scaled frames are output by calling the ScalingDoneCallback function. */
@@ -31,6 +29,10 @@ class VAAPIScaler
 	const char* const hardwareFrameFilterName;
 
 public:
+	using ScalingDoneCallback = std::function<void(AVFrame_Heap)>;
+
+	using CallbackType = ScalingDoneCallback;
+
 	/** Create a new VAAPIScaler with the given source and target dimensions.
 	 * @param sourceSize the size of the source frames that should be scaled
 	 * @param sourceFormat the pixel format of the sources frames
@@ -50,13 +52,16 @@ public:
 	 * Ownership of the frame is transferred to the callback.
 	 * This function is NOT thread-safe. */
 	SCW_EXPORT void scaleFrame(AVFrame& frame, const ScalingDoneCallback& scalingDone);
+
+	inline void processFrame(AVFrame& frame, const ScalingDoneCallback& scalingDone)
+	{ scaleFrame(frame, scalingDone); }
 };
 
 
-using ThreadedVAAPIScaler = ThreadedWrapper<VAAPIScaler, AVFrame_Heap, &VAAPIScaler::scaleFrame>;
+using ThreadedVAAPIScaler = ThreadedWrapper<VAAPIScaler>;
 
 // declare external instantiation for template
-extern template class ThreadedWrapper<VAAPIScaler, AVFrame_Heap, &VAAPIScaler::scaleFrame>;
+extern template class ThreadedWrapper<VAAPIScaler>;
 
 }
 

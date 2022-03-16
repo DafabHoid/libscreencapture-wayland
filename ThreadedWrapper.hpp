@@ -14,24 +14,27 @@
 namespace ffmpeg
 {
 
-template <typename OutputType>
-using FrameProcessedCallback = std::function<void(OutputType)>;
-
-template <typename FrameProcessor, typename OutputType>
-using FrameProcessMethod = void (FrameProcessor::*)(AVFrame&, const FrameProcessedCallback<OutputType>&);
-
-template <typename FrameProcessor, typename OutputType, FrameProcessMethod<FrameProcessor, OutputType> processMethod>
+/** Wrap the given frame processing class in a separate thread, so long-running operations
+ * do not block the caller.
+ * All frames given via the processFrame() method are forwarded to a thread owned by this object.
+ * The resulting frames are then passed to the callback that has been set with setFrameProcessedCallback().
+ *
+ * Type requirements:
+ * FrameProcessor must have a method void processFrame(AVFrame&, const FrameProcessor::CallbackType&) */
+template <typename FrameProcessor>
 class ThreadedWrapper
 {
+	using FrameProcessedCallback = typename FrameProcessor::CallbackType;
+
 	BlockingRingbuffer<AVFrame_Heap, 4> queue;
 	std::thread thread;
 	std::exception_ptr threadException;
-	FrameProcessedCallback<OutputType> frameProcessedCallback;
+	FrameProcessedCallback frameProcessedCallback;
 
 	FrameProcessor wrapped;
 
 	/** Take continuously frames from the queue and process them with the @em FrameProcessor by calling
-	 * its @em processMethod.*/
+	 * its @em processFrame method. */
 	void processFramesLoop() noexcept;
 
 	SCW_EXPORT void init();
@@ -47,7 +50,7 @@ public:
 	/** Signal the thread to stop, wait for it to terminate and then destroy the wrapped object. */
 	SCW_EXPORT ~ThreadedWrapper() noexcept;
 
-	SCW_EXPORT void setFrameProcessedCallback(FrameProcessedCallback<OutputType> cb) noexcept;
+	SCW_EXPORT void setFrameProcessedCallback(FrameProcessedCallback cb) noexcept;
 
 	/** Get access to the wrapped object. */
 	SCW_EXPORT FrameProcessor& unwrap() noexcept { return wrapped; }

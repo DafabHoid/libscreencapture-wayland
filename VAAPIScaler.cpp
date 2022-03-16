@@ -183,5 +183,5 @@ void VAAPIScaler::scaleFrame(AVFrame& frame, const ScalingDoneCallback& scalingD
 namespace ffmpeg
 {
 // instantiate code for template
-template class ThreadedWrapper<VAAPIScaler, AVFrame_Heap, &VAAPIScaler::scaleFrame>;
+template class ThreadedWrapper<VAAPIScaler>;
 }

@@ -88,5 +88,5 @@ void VAAPIEncoder::encodeFrame(AVFrame& gpuFrame, const EncodedCallback& encoded
 namespace ffmpeg
 {
 // instantiate code for template
-template class ThreadedWrapper<VAAPIEncoder, AVPacket&, &VAAPIEncoder::encodeFrame>;
+template class ThreadedWrapper<VAAPIEncoder>;
 }
