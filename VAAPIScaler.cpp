@@ -34,12 +34,13 @@ VAAPIScaler::VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targe
 	if (!inputIsDRMPrime)
 	{
 		// fix for hwupload on intel graphics:
-		// libva-intel claims to not support BGRA but only BGR0, even though
-		// libva-intel can import BGRA via DMABuf
+		// libva-intel claims to not support BGRA but only BGR0, even though it can import BGRA via DMABuf
 		if (sourceFormat == AV_PIX_FMT_BGRA)
 			sourceFormat = AV_PIX_FMT_BGR0;
 	}
 
+	// create source for filter graph
+	// the arguments provide information to the graph about what its input will look like
 	char args[128];
 	std::snprintf(args, sizeof(args), "video_size=%dx%d:pix_fmt=%d:time_base=1/%lld:pixel_aspect=1/1",
 	              sourceSize.w, sourceSize.h,
@@ -51,12 +52,14 @@ VAAPIScaler::VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targe
 		throw LibAVException(ret, "Failed to create filter graph input");
 	}
 
+	// create sink for filter graph
 	ret = avfilter_graph_create_filter(&filterSinkContext, buffersink, "out", nullptr, nullptr, filterGraph);
 	if (ret < 0)
 	{
 		throw LibAVException(ret, "Failed to create filter graph output");
 	}
 
+	// constrain the allowed pixel format on the graph output
 	AVPixelFormat allowedOutputPixFormats[] = { AV_PIX_FMT_VAAPI, AV_PIX_FMT_NONE };
 	ret = av_opt_set_int_list(filterSinkContext, "pix_fmts", allowedOutputPixFormats, AV_PIX_FMT_NONE, AV_OPT_SEARCH_CHILDREN);
 	if (ret < 0)
@@ -66,6 +69,9 @@ VAAPIScaler::VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targe
 
 	if (inputIsDRMPrime)
 	{
+		// if the input frames are DRM PRIME-allocated, they are on the GPU already
+		// → map frames directly to VAAPI
+		// → ffmpeg needs a HardwareFramesContext on input frames that associates them with the hardware device
 		AVBufferRef* hwFramesContext = av_hwframe_ctx_alloc(drmDevice);
 
 		AVHWFramesContext* hwCtx = reinterpret_cast<AVHWFramesContext*>(hwFramesContext->data);
@@ -80,6 +86,7 @@ VAAPIScaler::VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targe
 			throw LibAVException(ret, "Initializing GPU frame pool failed");
 		}
 
+		// give this context to the graph input so all input frames are automatically associated with it
 		AVBufferSrcParameters* srcParams = av_buffersrc_parameters_alloc();
 		srcParams->hw_frames_ctx = hwFramesContext;
 		av_buffersrc_parameters_set(filterSrcContext, srcParams);
@@ -102,6 +109,7 @@ VAAPIScaler::VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targe
 	inputs->pad_idx = 0;
 	inputs->next = nullptr;
 
+	// create the filter graph by parsing a description
 	char filterGraphDesc[128];
 	std::snprintf(filterGraphDesc, sizeof(filterGraphDesc),
 	              "%s,scale_vaapi=w=%d:h=%d:format=nv12:out_range=full",
@@ -113,11 +121,14 @@ VAAPIScaler::VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targe
 	{
 		throw LibAVException(ret, "Failed to parse filter graph");
 	}
+
+	// the hardware upload/map filter needs the VAAPI device to upload or map the frames to it
 	AVFilterContext* hardwareFrameFilter = avfilter_graph_get_filter(filterGraph, ("Parsed_"s + hardwareFrameFilterName + "_0").c_str());
 	if (!hardwareFrameFilter)
 		throw LibAVException(AVERROR(EINVAL), "could not find %s", hardwareFrameFilterName);
 	hardwareFrameFilter->hw_device_ctx = av_buffer_ref(vaapiDevice);
 
+	// configure the graph to ensure all nodes correctly connect to each other
 	ret = avfilter_graph_config(filterGraph, nullptr);
 	if (ret < 0)
 	{

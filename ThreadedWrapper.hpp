@@ -50,10 +50,14 @@ public:
 	/** Signal the thread to stop, wait for it to terminate and then destroy the wrapped object. */
 	SCW_EXPORT ~ThreadedWrapper() noexcept;
 
-	SCW_EXPORT void setFrameProcessedCallback(FrameProcessedCallback cb) noexcept;
+	SCW_EXPORT void setFrameProcessedCallback(FrameProcessedCallback cb) noexcept
+	{
+		frameProcessedCallback = std::move(cb);
+	}
 
 	/** Get access to the wrapped object. */
 	SCW_EXPORT FrameProcessor& unwrap() noexcept { return wrapped; }
+	SCW_EXPORT const FrameProcessor& unwrap() const noexcept { return wrapped; }
 
 	/** Add a frame into the thread queue. It will be taken by this object's thread in processFramesLoop().
 	 * If the queue is full, the frame will by silently dropped.

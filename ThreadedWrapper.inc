@@ -57,12 +57,4 @@ void ThreadedWrapper<FrameProcessor>::processFrame(AVFrame_Heap frame)
 	queue.enqueue(std::move(frame));
 }
 
-
-template <typename FrameProcessor>
-void ThreadedWrapper<FrameProcessor>::setFrameProcessedCallback(
-		FrameProcessedCallback cb) noexcept
-{
-	frameProcessedCallback = std::move(cb);
-}
-
 }
