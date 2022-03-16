@@ -1,6 +1,6 @@
 [submodule "sdbus-cpp"]
 	path = sdbus-cpp
-	url = ./sdbus-cpp/
+	url = https://github.com/Kistler-Group/sdbus-cpp.git
 [submodule "ffmpeg"]
 	path = ffmpeg
 	url = https://git.videolan.org/git/ffmpeg.git
