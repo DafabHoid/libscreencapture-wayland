@@ -12,7 +12,7 @@ using namespace std::chrono_literals;
 namespace ffmpeg
 {
 
-VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVBufferRef* hwDevice)
+VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVDictionary* codecOptions, AVBufferRef* hwDevice)
 : encodedFrame(av_packet_alloc())
 {
 	codec = avcodec_find_encoder_by_name("h264_vaapi");
@@ -36,13 +36,11 @@ VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVBufferRef*
 	codecContext->time_base = AVRational {1, std::chrono::duration_cast<std::chrono::microseconds>(1s).count()};
 	codecContext->sample_aspect_ratio = AVRational {1, 1};
 	codecContext->color_range = AVCOL_RANGE_JPEG;
-	codecContext->gop_size = 30;
-	codecContext->bit_rate = 4*1000*1000;
 	codecContext->pix_fmt = AV_PIX_FMT_VAAPI;
 	codecContext->flags |= AV_CODEC_FLAG_GLOBAL_HEADER; // provide codecContext->extradata for muxer instead of inside the packets
 	codecContext->hw_frames_ctx = hwFramesContext;
 
-	r = avcodec_open2(codecContext, codec, nullptr);
+	r = avcodec_open2(codecContext, codec, &codecOptions);
 	if (r)
 		throw LibAVException(r, "Opening encoder failed");
 }

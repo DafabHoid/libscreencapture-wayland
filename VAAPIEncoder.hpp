@@ -29,7 +29,7 @@ public:
 
 	using CallbackType = EncodedCallback;
 
-	SCW_EXPORT VAAPIEncoder(unsigned int width, unsigned int height, AVBufferRef* hwDevice);
+	SCW_EXPORT VAAPIEncoder(unsigned int width, unsigned int height, AVDictionary* codecOptions, AVBufferRef* hwDevice);
 	SCW_EXPORT VAAPIEncoder(VAAPIEncoder&&) noexcept;
 	           VAAPIEncoder(const VAAPIEncoder&) = delete;
 	SCW_EXPORT ~VAAPIEncoder() noexcept;

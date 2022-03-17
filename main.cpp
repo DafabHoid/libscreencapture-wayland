@@ -4,6 +4,10 @@
 #include "FFmpegOutput.hpp"
 #include <cstdio>
 #include <unistd.h>
+extern "C"
+{
+#include <libavutil/opt.h>
+}
 
 #ifndef NDEBUG
 #include <execinfo.h>
@@ -11,6 +15,14 @@
 #include <cstring>
 #endif
 
+static AVDictionary* streamingDefaults()
+{
+	AVDictionary* codecOptions {};
+	av_dict_set_int(&codecOptions, "g", 30, 0);
+	av_dict_set_int(&codecOptions, "b", 5*1000*1000, 0);
+	av_dict_set_int(&codecOptions, "qmin", 35, 0);
+	return codecOptions;
+}
 
 int main(int argc, char** argv)
 {
@@ -37,7 +49,8 @@ int main(int argc, char** argv)
 					builder
 						.withHWDevice("/dev/dri/renderD129")
 						.withOutputFormat("rtsp")
-						.withOutputPath("rtsp://[::1]:8654/screen");
+						.withOutputPath("rtsp://[::1]:8654/screen")
+						.withCodecOptions(streamingDefaults());
 					ffmpegOutput = std::make_unique<ffmpeg::FFmpegOutput>(builder.build());
 				}
 				void streamDisconnected() override
