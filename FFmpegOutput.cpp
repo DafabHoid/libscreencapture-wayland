@@ -51,6 +51,9 @@ FFmpegOutput::FFmpegOutput(std::unique_ptr<ThreadedVAAPIScaler> scaler,
 	});
 }
 
+FFmpegOutput::FFmpegOutput(FFmpegOutput&&) = default;
+FFmpegOutput::~FFmpegOutput() = default;
+
 void FFmpegOutput::pushFrame(AVFrame_Heap frame)
 {
 	scaler->processFrame(std::move(frame));

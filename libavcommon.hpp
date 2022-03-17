@@ -21,7 +21,7 @@ using common::PixelFormat;
 using common::MemoryFrame;
 using common::DmaBufFrame;
 
-class LibAVException : public std::exception
+class SCW_EXPORT LibAVException : public std::exception
 {
 	char message[128];
 public:
