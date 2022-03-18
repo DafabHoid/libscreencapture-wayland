@@ -272,7 +272,7 @@ SharedScreen_t* requestPipeWireShareFromPortal(CursorMode cursorMode)
 		auto& cppStruct = shareInfo.value();
 		cStruct->pipeWireFd = cppStruct.pipeWireFd;
 		cStruct->pipeWireNode = cppStruct.pipeWireNode;
-		cStruct->connection = cppStruct.dbusConnection.release();
+		cStruct->connection = new std::shared_ptr<sdbus::IConnection>(cppStruct.dbusConnection);
 		return cStruct;
 	}
 	catch (const std::exception& e)
@@ -284,7 +284,7 @@ SharedScreen_t* requestPipeWireShareFromPortal(CursorMode cursorMode)
 
 void dropSharedScreen(SharedScreen_t* shareInfo)
 {
-	sdbus::IConnection* conn = static_cast<sdbus::IConnection *>(shareInfo->connection);
+	auto* conn = static_cast<std::shared_ptr<sdbus::IConnection>*>(shareInfo->connection);
 	delete conn;
 	delete shareInfo;
 }

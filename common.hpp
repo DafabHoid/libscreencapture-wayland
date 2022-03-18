@@ -8,14 +8,17 @@
 
 #include <cstdint>
 #include <functional>
-#include <memory> // unique_ptr
+#include <memory> // shared_ptr
 #include <optional>
 #include <chrono>
 
 #define SCW_EXPORT [[gnu::visibility("default")]]
 
 
-#include <sdbus-c++/IConnection.h>
+namespace sdbus
+{
+class IConnection;
+}
 
 namespace common
 {
@@ -25,7 +28,7 @@ struct SharedScreen
 	/** The D-Bus connection through which the shared screen has been requested.
 	 * Deleting this pointer will close the connection and automatically invalidate #pipeWireNode,
 	 * so keep it open as long as you need the shared screen. */
-	std::unique_ptr<sdbus::IConnection> dbusConnection;
+	std::shared_ptr<sdbus::IConnection> dbusConnection;
 
 	/** file descriptor where the PipeWire server can be reached */
 	int pipeWireFd;
