@@ -21,7 +21,7 @@ namespace ffmpeg
 /** Upload and scale frames on the GPU using VAAPI.
  * Frames are converted to the NV12 pixel format during this process.
  * Scaled frames are output by calling the ScalingDoneCallback function. */
-class VAAPIScaler
+class SCW_EXPORT VAAPIScaler
 {
 	AVFilterGraph* filterGraph;
 	AVFilterContext* filterSrcContext;
@@ -40,18 +40,18 @@ public:
 	 * @param drmDevice the DRM device that provides input frames, when inputIsDRMPrime is true
 	 * @param vaapiDevice the VAAPI device that should do the scaling
 	 * @param inputIsDRMPrime if the input frames are DRM PRIME frames instead of normal memory frames */
-	SCW_EXPORT VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targetSize,
+	VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targetSize,
 	            AVBufferRef* drmDevice, AVBufferRef* vaapiDevice, bool inputIsDRMPrime);
 
-	SCW_EXPORT VAAPIScaler(VAAPIScaler&&) noexcept;
-	           VAAPIScaler(const VAAPIScaler&) = delete;
-	SCW_EXPORT ~VAAPIScaler() noexcept;
+	VAAPIScaler(VAAPIScaler&&) noexcept;
+	VAAPIScaler(const VAAPIScaler&) = delete;
+	~VAAPIScaler() noexcept;
 
 	/** Scale a single frame.
 	 * After scaling, the given ScalingDoneCallback is called with the scaled frame.
 	 * Ownership of the frame is transferred to the callback.
 	 * This function is NOT thread-safe. */
-	SCW_EXPORT void scaleFrame(AVFrame& frame, const ScalingDoneCallback& scalingDone);
+	void scaleFrame(AVFrame& frame, const ScalingDoneCallback& scalingDone);
 
 	inline void processFrame(AVFrame& frame, const ScalingDoneCallback& scalingDone)
 	{ scaleFrame(frame, scalingDone); }

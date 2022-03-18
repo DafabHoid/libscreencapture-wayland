@@ -29,10 +29,6 @@ class FFmpegOutput
 	        std::unique_ptr<Muxer> muxer) noexcept;
 
 public:
-	SCW_EXPORT FFmpegOutput(FFmpegOutput&&);
-	           FFmpegOutput(const FFmpegOutput&) = delete;
-	SCW_EXPORT ~FFmpegOutput();
-
 	SCW_EXPORT void pushFrame(AVFrame_Heap frame);
 
 
