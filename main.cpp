@@ -24,11 +24,59 @@ static AVDictionary* streamingDefaults()
 	return codecOptions;
 }
 
+static void printUsage(const char* argv0)
+{
+	printf("Usage: %s [-c] -f <output format> -o <output path> -d <hardware device path>\n", argv0);
+	puts("\tWhere <hardware device path> is a DRM render node like /dev/dri/renderD128");
+	puts("\tWhere <output format> and <output path> can be any string that is recognized by ffmpeg");
+}
+
 int main(int argc, char** argv)
 {
+	int c;
+	bool withCursor = false;
+	char* hardwareDevicePath;
+	const char* outputPath = nullptr;
+	const char* outputFormat = nullptr;
+	while ((c = getopt(argc, argv, "co:f:d:")) != -1)
+	{
+		switch (c)
+		{
+			case 'c':
+				withCursor = true;
+				break;
+			case 'o':
+				outputPath = optarg;
+				break;
+			case 'f':
+				outputFormat = optarg;
+				break;
+			case 'd':
+				hardwareDevicePath = optarg;
+				break;
+			case '?':
+				fprintf(stderr, "Unrecognized option: '-%c'\n", optopt);
+				printUsage(argv[0]);
+				return 1;
+		}
+	}
+	if (!outputPath || !outputFormat)
+	{
+		fprintf(stderr, "Both output path and format must be specified\n");
+		printUsage(argv[0]);
+		return 1;
+	}
+	if (!hardwareDevicePath)
+	{
+		fprintf(stderr, "Missing hardware device path\n");
+		printUsage(argv[0]);
+		return 1;
+	}
+
 	try
 	{
-		std::optional<portal::SharedScreen> shareInfo = portal::requestPipeWireShare(CURSOR_MODE_EMBED);
+		auto cursorMode = withCursor ? CURSOR_MODE_EMBED : CURSOR_MODE_HIDDEN;
+		std::optional<portal::SharedScreen> shareInfo = portal::requestPipeWireShare(cursorMode);
 		if (!shareInfo)
 		{
 			printf("User cancelled request\n");
@@ -42,14 +90,24 @@ int main(int argc, char** argv)
 			class Stream2FFmpeg : public pw::StreamCallbacks
 			{
 				std::unique_ptr<ffmpeg::FFmpegOutput> ffmpegOutput;
+				const char* hardwareDevice;
+				const char* outputFormat;
+				const char* outputPath;
+
 			public:
+				inline Stream2FFmpeg(const char* hardwareDevice, const char* outputFormat, const char* outputPath)
+				: hardwareDevice{hardwareDevice},
+				  outputFormat{outputFormat},
+				  outputPath{outputPath}
+				{}
+
 				void streamConnected(pw::Rect dimensions, pw::PixelFormat format, bool isDmaBuf) override
 				{
 					ffmpeg::FFmpegOutput::Builder builder(dimensions, format, isDmaBuf);
 					builder
-						.withHWDevice("/dev/dri/renderD129")
-						.withOutputFormat("rtsp")
-						.withOutputPath("rtsp://[::1]:8654/screen")
+						.withHWDevice(hardwareDevice)
+						.withOutputFormat(outputFormat)
+						.withOutputPath(outputPath)
 						.withCodecOptions(streamingDefaults());
 					ffmpegOutput = std::make_unique<ffmpeg::FFmpegOutput>(builder.build());
 				}
@@ -66,7 +124,7 @@ int main(int argc, char** argv)
 					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(std::move(frame))));
 				}
 			};
-			Stream2FFmpeg stream2FFmpeg;
+			Stream2FFmpeg stream2FFmpeg(hardwareDevicePath, outputFormat, outputPath);
 			auto pwStream = pw::PipeWireStream(shareInfo.value(), stream2FFmpeg);
 			pwStream.runStreamLoop();
 		}
