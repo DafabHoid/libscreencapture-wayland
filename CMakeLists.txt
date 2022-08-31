@@ -13,6 +13,7 @@ set(CMAKE_CXX_EXTENSIONS False)
 option(ENABLE_PORTAL_MODULE "Enable the xdg-desktop-portal module" ON)
 option(ENABLE_PIPEWIRE_MODULE "Enable the PipeWire module" ON)
 option(ENABLE_FFMPEG_MODULE "Enable the FFmpeg encoder module" ON)
+option(ENABLE_GSTREAMER_MODULE "Enable the GStreamer encoder module" ON)
 option(BUILD_SHARED_LIBS "Build a shared library instead of a static one" OFF)
 option(BUILD_FFMPEG "Build own ffmpeg libraries instead of using system-provided ones" OFF)
 option(USE_LIBC++ "Use libc++ as C++ standard library instead of libstdc++ when compiling with clang" ON)
@@ -84,6 +85,16 @@ else()
 endif() # BUILD_FFMPEG
 endif() # ENABLE_FFMPEG_MODULE
 
+if (ENABLE_GSTREAMER_MODULE)
+    pkg_check_modules(gstcore REQUIRED IMPORTED_TARGET gstreamer-base-1.0)
+    pkg_check_modules(gstvideo REQUIRED IMPORTED_TARGET gstreamer-video-1.0)
+    pkg_check_modules(gstapp REQUIRED IMPORTED_TARGET gstreamer-app-1.0)
+    set(GSTREAMER_LIBS
+            PkgConfig::gstcore
+            PkgConfig::gstapp
+            PkgConfig::gstvideo)
+endif()
+
 
 
 ######################################
@@ -133,6 +144,15 @@ if (ENABLE_FFMPEG_MODULE)
     endif()
 
     target_link_libraries(screencapture-wayland PUBLIC screencapture-module-ffmpeg)
+endif()
+
+if (ENABLE_GSTREAMER_MODULE)
+    add_library(screencapture-module-gst OBJECT common.hpp BlockingRingbuffer.hpp
+            ThreadedWrapper.inc ThreadedWrapper.hpp
+            GstOutput.cpp GstOutput.hpp)
+    target_link_libraries(screencapture-module-gst PUBLIC ${GSTREAMER_LIBS} Threads::Threads)
+    set_property(TARGET screencapture-module-gst PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+    target_link_libraries(screencapture-wayland PUBLIC screencapture-module-gst)
 endif()
 
 

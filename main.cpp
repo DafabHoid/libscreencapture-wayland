@@ -1,13 +1,9 @@
 #include <pipewire/pipewire.h>
 #include "PipeWireStream.hpp"
 #include "xdg-desktop-portal.hpp"
-#include "FFmpegOutput.hpp"
+#include "GstOutput.hpp"
 #include <cstdio>
 #include <unistd.h>
-extern "C"
-{
-#include <libavutil/opt.h>
-}
 
 #ifndef NDEBUG
 #include <execinfo.h>
@@ -15,14 +11,6 @@ extern "C"
 #include <cstring>
 #endif
 
-static AVDictionary* streamingDefaults()
-{
-	AVDictionary* codecOptions {};
-	av_dict_set_int(&codecOptions, "g", 30, 0);
-	av_dict_set_int(&codecOptions, "b", 5*1000*1000, 0);
-	av_dict_set_int(&codecOptions, "qmin", 35, 0);
-	return codecOptions;
-}
 
 static void printUsage(const char* argv0)
 {
@@ -86,10 +74,12 @@ int main(int argc, char** argv)
 		printf("SharedScreen fd = %d, node = %u\n", shareInfo.value().pipeWireFd, shareInfo.value().pipeWireNode);
 		pw_init(&argc, &argv);
 
+		gst_init(&argc, &argv);
+
 		{
 			class Stream2FFmpeg : public pw::StreamCallbacks
 			{
-				std::unique_ptr<ffmpeg::FFmpegOutput> ffmpegOutput;
+				std::unique_ptr<gstreamer::GstOutput> gstOutput;
 				const char* hardwareDevice;
 				const char* outputFormat;
 				const char* outputPath;
@@ -103,32 +93,32 @@ int main(int argc, char** argv)
 
 				void streamConnected(pw::Rect dimensions, pw::PixelFormat format, bool isDmaBuf) override
 				{
-					ffmpeg::FFmpegOutput::Builder builder(dimensions, format, isDmaBuf);
+					auto builder = gstreamer::GstOutput::Builder(dimensions, format);
 					builder
+						.withScaling(common::Rect {1920u, 1080u})
 						.withHWDevice(hardwareDevice)
 						.withOutputFormat(outputFormat)
-						.withOutputPath(outputPath)
-						.withCodecOptions(streamingDefaults());
-					ffmpegOutput = std::make_unique<ffmpeg::FFmpegOutput>(builder.build());
+						.withOutputPath(outputPath);
+					gstOutput = std::make_unique<gstreamer::GstOutput>(builder.build());
 				}
 				void streamDisconnected() override
 				{
-					ffmpegOutput.reset();
+					gstOutput.reset();
 				}
 				void pushMemoryFrame(std::unique_ptr<pw::MemoryFrame> frame) override
 				{
-					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(std::move(frame))));
+					gstOutput->pushFrame(std::move(frame));
 				}
 				void pushDmaBufFrame(std::unique_ptr<pw::DmaBufFrame> frame) override
 				{
-					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(ffmpeg::wrapInAVFrame(std::move(frame))));
 				}
 			};
 			Stream2FFmpeg stream2FFmpeg(hardwareDevicePath, outputFormat, outputPath);
-			auto pwStream = pw::PipeWireStream(shareInfo.value(), stream2FFmpeg, true);
+			auto pwStream = pw::PipeWireStream(shareInfo.value(), stream2FFmpeg, false);
 			pwStream.runStreamLoop();
 		}
 
+		gst_deinit();
 		pw_deinit();
 		return 0;
 	}
