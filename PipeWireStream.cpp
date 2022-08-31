@@ -326,7 +326,7 @@ static const spa_pod* buildStreamParams(spa_pod_builder& b, bool withDMABuf)
 }
 
 PipeWireStream::PipeWireStream(const SharedScreen& shareInfo,
-                               StreamCallbacks& cbs)
+                               StreamCallbacks& cbs, bool supportDmaBuf)
 : mainLoop{pw_main_loop_new(nullptr)},
   ctx{pw_context_new(pw_main_loop_get_loop(mainLoop), nullptr, 0)},
   core{},
@@ -364,7 +364,7 @@ PipeWireStream::PipeWireStream(const SharedScreen& shareInfo,
 	spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
 	const spa_pod* params[2];
 
-	params[0] = buildStreamParams(b, true);
+	params[0] = buildStreamParams(b, supportDmaBuf);
 	params[1] = buildStreamParams(b, false);
 
 	assert(params[0] && params[1] && params[0]->size + params[1]->size <= sizeof(buffer));
@@ -526,7 +526,7 @@ struct PipeWireStream* PipeWireStream_connect(const SharedScreen_t* c_shareInfo,
 				c_shareInfo->pipeWireFd,
 				c_shareInfo->pipeWireNode
 		};
-		pws->cppStream = std::make_unique<pw::PipeWireStream>(shareInfo, pws->wrappedCallbacks);
+		pws->cppStream = std::make_unique<pw::PipeWireStream>(shareInfo, pws->wrappedCallbacks, true);
 	}
 	catch (const std::exception& e)
 	{

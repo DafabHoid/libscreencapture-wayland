@@ -35,7 +35,7 @@ int main(int argc, char** argv)
 {
 	int c;
 	bool withCursor = false;
-	char* hardwareDevicePath;
+	char* hardwareDevicePath = nullptr;
 	const char* outputPath = nullptr;
 	const char* outputFormat = nullptr;
 	while ((c = getopt(argc, argv, "co:f:d:")) != -1)
@@ -125,7 +125,7 @@ int main(int argc, char** argv)
 				}
 			};
 			Stream2FFmpeg stream2FFmpeg(hardwareDevicePath, outputFormat, outputPath);
-			auto pwStream = pw::PipeWireStream(shareInfo.value(), stream2FFmpeg);
+			auto pwStream = pw::PipeWireStream(shareInfo.value(), stream2FFmpeg, true);
 			pwStream.runStreamLoop();
 		}
 

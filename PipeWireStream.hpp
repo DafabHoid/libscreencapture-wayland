@@ -98,7 +98,7 @@ public:
 	 * To actually start streaming and pushing frames to the later stages, you need to call runStreamLoop().
 	 * The given callback interface's methods are called for their respective events. See its documentation for information
 	 * about how they are used. */
-	SCW_EXPORT PipeWireStream(const SharedScreen& shareInfo, StreamCallbacks& streamCallbacks);
+	SCW_EXPORT PipeWireStream(const SharedScreen& shareInfo, StreamCallbacks& streamCallbacks, bool supportDmaBuf);
 
 	SCW_EXPORT ~PipeWireStream() noexcept;
 
