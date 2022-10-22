@@ -26,11 +26,11 @@ class GstOutput
 			  const std::string& hwDevicePath, const std::string& outputPath, const std::string& outputFormat);
 
 public:
-	~GstOutput() noexcept;
-	GstOutput(GstOutput&&);
-	GstOutput operator=(GstOutput&&);
+	SCW_EXPORT ~GstOutput() noexcept;
+	SCW_EXPORT GstOutput(GstOutput&&);
+	SCW_EXPORT GstOutput operator=(GstOutput&&);
 
-	void pushFrame(std::unique_ptr<common::MemoryFrame> frame);
+	SCW_EXPORT void pushFrame(std::unique_ptr<common::MemoryFrame> frame);
 
 	class Builder
 	{
