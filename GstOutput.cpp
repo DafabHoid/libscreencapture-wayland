@@ -70,16 +70,31 @@ static void pollMessages(GstElement* pipeline) noexcept
 }
 
 GstOutput::GstOutput(Rect sourceSize, PixelFormat sourceFormat, Rect scaledSize,
-                     const std::string& hwDevicePath, const std::string& outputPath, const std::string& outputFormat)
+                     const std::string& hwDevicePath, Codec codec,
+                     const std::string& outputPath, const std::string& outputFormat)
 {
+	const char* codecName;
+	const char* codecParser;
+	switch (codec)
+	{
+		case Codec::H264:
+			codecName = "h264";
+			codecParser = "h264parse";
+			break;
+		case Codec::H265:
+			codecName = "h265";
+			codecParser = "h265parse";
+			break;
+	}
 	char pipelineDescription[600];
 	snprintf(pipelineDescription, sizeof(pipelineDescription),
 			"appsrc max-buffers=8 block=true name=appsrc ! video/x-raw, format=%s, width=%u, height=%u, framerate=0/1, interlace-mode=progressive "
-			"! vaapipostproc width=%u height=%u ! vaapih265enc quality-level=6 rate-control=cqp init-qp=26 name=encoder "
-			"! h265parse ! queue max-size-buffers=8 ! mpegtsmux name=mux ! filesink location=%s",
+			"! vaapipostproc width=%u height=%u ! vaapi%senc quality-level=6 rate-control=cqp init-qp=26 name=encoder "
+			"! %s ! queue max-size-buffers=8 ! mpegtsmux name=mux ! filesink location=%s",
 			gst_video_format_to_string(pixelFormat2Gst(sourceFormat)),
 			sourceSize.w, sourceSize.h,
 			scaledSize.w, scaledSize.h,
+			codecName, codecParser,
 			outputPath.c_str());
 
 	GError* err {};
@@ -122,7 +137,8 @@ GstOutput::GstOutput(GstOutput&& o)
 GstOutput::Builder::Builder(common::Rect sourceSize, common::PixelFormat sourceFormat) noexcept
 : sourceSize(sourceSize),
   sourceFormat(sourceFormat),
-  targetSize(sourceSize)
+  targetSize(sourceSize),
+  codec(Codec::H264)
 {
 }
 
@@ -144,7 +160,7 @@ GstOutput GstOutput::Builder::build()
 	{
 		throw GStreamerException("No hardware device path specified");
 	}
-	return GstOutput(sourceSize, sourceFormat, targetSize, hwDevicePath, outputPath, outputFormat);
+	return GstOutput(sourceSize, sourceFormat, targetSize, hwDevicePath, codec, outputPath, outputFormat);
 }
 
 static void onFrameMemoryDropped(void* p)

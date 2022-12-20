@@ -16,6 +16,12 @@ namespace gstreamer
 using common::PixelFormat;
 using common::Rect;
 
+enum class Codec
+{
+	H264,
+	H265,
+};
+
 class GstOutput
 {
 	GstElement* pipeline;
@@ -23,7 +29,8 @@ class GstOutput
 
 	void pushFrame(GstBuffer* buf);
 	GstOutput(Rect sourceSize, PixelFormat sourceFormat, Rect scaledSize,
-			  const std::string& hwDevicePath, const std::string& outputPath, const std::string& outputFormat);
+	          const std::string& hwDevicePath, Codec codec,
+	          const std::string& outputPath, const std::string& outputFormat);
 
 public:
 	SCW_EXPORT ~GstOutput() noexcept;
@@ -39,6 +46,7 @@ public:
 		Rect targetSize;
 		std::string outputFormat;
 		std::string outputPath;
+		Codec codec;
 		std::string hwDevicePath;
 
 	public:
@@ -65,6 +73,12 @@ public:
 		SCW_EXPORT Builder& withOutputPath(std::string path) noexcept
 		{
 			outputPath = std::move(path);
+			return *this;
+		}
+
+		SCW_EXPORT Builder& withCodec(Codec c) noexcept
+		{
+			codec = c;
 			return *this;
 		}
 
