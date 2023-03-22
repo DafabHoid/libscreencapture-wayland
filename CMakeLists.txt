@@ -20,9 +20,6 @@ option(USE_LIBC++ "Use libc++ as C++ standard library instead of libstdc++ when 
 # use static C++ library by default to reduce possible ABI breakages at runtime
 option(STATIC_LIBSTDC++ "Link with static C++ standard library" ON)
 
-# set cpu requirements to a more modern instruction set: x86-64-v3 (includes AVX2, BMI etc.)
-set(CMAKE_CXX_FLAGS "-march=x86-64-v3 -save-temps=obj -masm=intel ${CMAKE_CXX_FLAGS}")
-
 # set stdlib flags globally if enabled on clang
 if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" AND ${USE_LIBC++})
     set(stdlib libc++)
