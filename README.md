@@ -64,7 +64,7 @@ It uses GPU encoding with VAAPI (supported on Intel and AMD graphic cards).
 3. Encoding: The `h264_vaapi` encoder compresses the frames to a H.264 video stream.
 4. Muxing: The video stream is packed into a container format and written to a file or sent over the network.
 
-#### Why don't you use ffmpeg directly?
+#### Why don't you just use the ffmpeg application?
 Unfortunately the video frames can't be passed to ffmpeg directly, because ffmpeg would be running as a separate process.
 It does not support PipeWire either, so you can't forward the PipeWire stream to ffmpeg.
 This means that all frames have to be copied to a socket, pipe or file.
@@ -72,6 +72,14 @@ ffmpeg itself would then copy the data from there into the memory, and potential
 This is highly inefficient and slow.
 
 So the ffmpeg code has to run in the same process as the PipeWire module, meaning that the various libav libraries must be used directly.
+
+### GStreamer module
+The GStreamer module implements a video encoder by using the [GStreamer framework](https://gstreamer.freedesktop.org/).
+It is an alternative to the FFmpeg module and can sometimes offer better encoding performance.
+It performs the same steps as the FFmpeg module to encode the video frames,
+but does so by creating a GStreamer pipeline with stages very similar to the stages seen in the FFmpeg section of this document.
+
+One exception is that GStreamer currently does not offer a way to pass DmaBuf frames to the encoding pipeline, so in the hardware upload step a copy is always necessary.
 
 Building the library
 ====================
@@ -99,3 +107,10 @@ Or
 - `zlib`
 
 for building a minimal ffmpeg with VAAPI support.
+
+For the GStreamer module:
+
+- `gstreamer-base`
+- `gstreamer-app` – To feed the video stream into GStreamer
+- `gstreamer-video` – For video formats
+- `gstreamer-vaapi` – For hardware accelerated video encoding
