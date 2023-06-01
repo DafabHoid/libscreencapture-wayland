@@ -16,20 +16,8 @@ option(ENABLE_FFMPEG_MODULE "Enable the FFmpeg encoder module" ON)
 option(ENABLE_GSTREAMER_MODULE "Enable the GStreamer encoder module" ON)
 option(BUILD_SHARED_LIBS "Build a shared library instead of a static one" OFF)
 option(BUILD_FFMPEG "Build own ffmpeg libraries instead of using system-provided ones" OFF)
-option(USE_LIBC++ "Use libc++ as C++ standard library instead of libstdc++ when compiling with clang" OFF)
 # use static C++ library by default to reduce possible ABI breakages at runtime
 option(STATIC_LIBSTDC++ "Link with static C++ standard library" ON)
-
-if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" AND ${USE_LIBC++})
-    # use libc++ as stdlib for all source files
-    set(stdlib libc++)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=${stdlib}")
-
-    find_program(lld NAMES lld)
-    if(NOT lld AND ${STATIC_LIBSTDC++})
-        message(WARNING "LLVM linker lld not found. It is required to properly link the libc++ library statically")
-    endif()
-endif()
 
 # set symbol visibility to hidden by default (prevents accidental linking against internal symbols)
 if (NOT DEFINED CMAKE_CXX_VISIBILITY_PRESET AND
@@ -179,12 +167,4 @@ if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
     # clang needlessly vectorizes the string replace code, even though the string is quite small
     # disable vectorize for this file to reduce code size
     set_source_files_properties(xdg-desktop-portal.cpp PROPERTIES COMPILE_OPTIONS "-fno-vectorize")
-    # use LLVM linker (faster than gnu ld)
-    if(${USE_LIBC++} AND ${STATIC_LIBSTDC++})
-        # link c++abi statically too
-        target_link_options(screencapture PRIVATE -Wl,--push-state,-Bstatic -lc++abi -Wl,--pop-state)
-    endif()
-    if(lld)
-        target_link_options(screencapture PRIVATE -fuse-ld=lld)
-    endif()
 endif()
