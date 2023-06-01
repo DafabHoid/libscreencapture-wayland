@@ -20,17 +20,18 @@ option(USE_LIBC++ "Use libc++ as C++ standard library instead of libstdc++ when 
 # use static C++ library by default to reduce possible ABI breakages at runtime
 option(STATIC_LIBSTDC++ "Link with static C++ standard library" ON)
 
-# set stdlib flags globally if enabled on clang
 if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" AND ${USE_LIBC++})
+    # use libc++ as stdlib for all source files
     set(stdlib libc++)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=${stdlib}")
+
     find_program(lld NAMES lld)
     if(NOT lld AND ${STATIC_LIBSTDC++})
         message(WARNING "LLVM linker lld not found. It is required to properly link the libc++ library statically")
     endif()
 endif()
 
-# set symbol visibility to hidden by default
+# set symbol visibility to hidden by default (prevents accidental linking against internal symbols)
 if (NOT DEFINED CMAKE_CXX_VISIBILITY_PRESET AND
         NOT DEFINED CMAKE_VISIBILITY_INLINES_HIDDEN)
     set(CMAKE_CXX_VISIBILITY_PRESET hidden)
@@ -54,6 +55,7 @@ if(ENABLE_PORTAL_MODULE)
     # use function to create a new scope for variables
     ImportSDBusCpp()
     # set the PIC flag correctly (is always off otherwise, because it is a static library)
+    # but we include it in our library, so it must match in position independence
     set_target_properties(sdbus-c++-objlib PROPERTIES POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
 endif()
 
@@ -99,6 +101,7 @@ endif()
 ######################################
 
 add_library(screencapture-wayland common.hpp include/c_common.h)
+# remove unused code and enable RelRO
 target_link_options(screencapture-wayland PRIVATE -Wl,-z,now -Wl,-gc-sections)
 
 
