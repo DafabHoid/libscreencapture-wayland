@@ -6,7 +6,7 @@
 #ifndef SCREENCAPTURE_FFMPEGOUTPUT_HPP
 #define SCREENCAPTURE_FFMPEGOUTPUT_HPP
 
-#include "common.hpp"
+#include "../common.hpp"
 #include "libavcommon.hpp"
 #include "VAAPIEncoder.hpp"
 #include "VAAPIScaler.hpp"

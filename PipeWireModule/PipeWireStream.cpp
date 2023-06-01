@@ -3,7 +3,6 @@
 
    SPDX-License-Identifier: GPL-3.0-or-later
 *******************************************************************************/
-#include "common.hpp"
 #include "PipeWireStream.hpp"
 #include <spa/param/video/format-utils.h>
 #include <spa/pod/pod.h>

@@ -6,7 +6,6 @@
 #include <cstdarg>
 #include <chrono>
 #include <string>
-#include "common.hpp"
 
 using namespace std::chrono_literals;
 

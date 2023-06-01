@@ -1,7 +1,7 @@
 #include <pipewire/pipewire.h>
-#include "PipeWireStream.hpp"
-#include "xdg-desktop-portal.hpp"
-#include "GstOutput.hpp"
+#include "PipeWireModule/PipeWireStream.hpp"
+#include "PortalModule/xdg-desktop-portal.hpp"
+#include "GStreamerModule/GstOutput.hpp"
 #include <cstdio>
 #include <unistd.h>
 

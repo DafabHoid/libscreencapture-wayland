@@ -95,7 +95,8 @@ target_link_options(screencapture-wayland PRIVATE -Wl,-z,now -Wl,-gc-sections)
 
 if(ENABLE_PORTAL_MODULE)
     add_library(screencapture-module-portal OBJECT common.hpp include/c_common.h
-            xdg-desktop-portal.cpp xdg-desktop-portal.hpp
+            PortalModule/xdg-desktop-portal.cpp
+            PortalModule/xdg-desktop-portal.hpp
             include/module-portal.h)
     target_include_directories(screencapture-module-portal PUBLIC include/)
     if(BUILD_SHARED_LIBS)
@@ -113,7 +114,8 @@ endif()
 
 if (ENABLE_PIPEWIRE_MODULE)
     add_library(screencapture-module-pipewire OBJECT common.hpp include/c_common.h
-            PipeWireStream.cpp PipeWireStream.hpp
+            PipeWireModule/PipeWireStream.cpp
+            PipeWireModule/PipeWireStream.hpp
             include/module-pipewire.h)
     target_include_directories(screencapture-module-pipewire PUBLIC include/)
     target_link_libraries(screencapture-module-pipewire PUBLIC PkgConfig::pipewire)
@@ -124,13 +126,19 @@ endif()
 
 
 if (ENABLE_FFMPEG_MODULE)
-    add_library(screencapture-module-ffmpeg OBJECT libavcommon.hpp
-            BlockingRingbuffer.hpp
-            FFmpegOutput.cpp FFmpegOutput.hpp
-            VAAPIEncoder.cpp VAAPIEncoder.hpp
-            VAAPIScaler.cpp VAAPIScaler.hpp
-            Muxer.cpp Muxer.hpp
-            ThreadedWrapper.inc ThreadedWrapper.hpp)
+    add_library(screencapture-module-ffmpeg OBJECT
+            FFMPEGModule/libavcommon.hpp
+            FFMPEGModule/BlockingRingbuffer.hpp
+            FFMPEGModule/FFmpegOutput.cpp
+            FFMPEGModule/FFmpegOutput.hpp
+            FFMPEGModule/VAAPIEncoder.cpp
+            FFMPEGModule/VAAPIEncoder.hpp
+            FFMPEGModule/VAAPIScaler.cpp
+            FFMPEGModule/VAAPIScaler.hpp
+            FFMPEGModule/Muxer.cpp
+            FFMPEGModule/Muxer.hpp
+            FFMPEGModule/ThreadedWrapper.inc
+            FFMPEGModule/ThreadedWrapper.hpp)
     target_link_libraries(screencapture-module-ffmpeg PUBLIC ${FFMPEG_LIBS} Threads::Threads)
     set_property(TARGET screencapture-module-ffmpeg PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
     if(${BUILD_FFMPEG})
@@ -141,9 +149,9 @@ if (ENABLE_FFMPEG_MODULE)
 endif()
 
 if (ENABLE_GSTREAMER_MODULE)
-    add_library(screencapture-module-gst OBJECT common.hpp BlockingRingbuffer.hpp
-            ThreadedWrapper.inc ThreadedWrapper.hpp
-            GstOutput.cpp GstOutput.hpp)
+    add_library(screencapture-module-gst OBJECT common.hpp
+            GStreamerModule/GstOutput.cpp
+            GStreamerModule/GstOutput.hpp)
     target_link_libraries(screencapture-module-gst PUBLIC ${GSTREAMER_LIBS} Threads::Threads)
     set_property(TARGET screencapture-module-gst PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
     target_link_libraries(screencapture-wayland PUBLIC screencapture-module-gst)

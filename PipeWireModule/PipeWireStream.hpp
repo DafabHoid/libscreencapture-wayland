@@ -6,7 +6,7 @@
 #ifndef SCREENCAPTURE_PIPEWIRESTREAM_HPP
 #define SCREENCAPTURE_PIPEWIRESTREAM_HPP
 
-#include "common.hpp"
+#include "../common.hpp"
 #include <cstdint>
 #include <exception>
 #include <chrono>

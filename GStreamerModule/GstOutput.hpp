@@ -6,7 +6,7 @@
 #ifndef SCREENCAPTURE_GSTOUTPUT_HPP
 #define SCREENCAPTURE_GSTOUTPUT_HPP
 
-#include "common.hpp"
+#include "../common.hpp"
 #include <gst/gst.h>
 #include <exception>
 #include <string>

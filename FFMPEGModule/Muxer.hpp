@@ -7,7 +7,7 @@
 #define SCREENCAPTURE_MUXER_HPP
 
 #include <string>
-#include "common.hpp"
+#include "../common.hpp"
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>

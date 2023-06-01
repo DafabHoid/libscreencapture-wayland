@@ -6,7 +6,7 @@
 #ifndef SCREENCAPTURE_LIBAVCOMMON_HPP
 #define SCREENCAPTURE_LIBAVCOMMON_HPP
 
-#include "common.hpp"
+#include "../common.hpp"
 #include <exception>
 
 extern "C" {
