@@ -7,7 +7,7 @@
 # ffmpeg minimal build with static libraries
 include(ExternalProject)
 message("Building minimal FFmpeg libraries")
-if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     set(FFMPEG_OPTIMIZATION_FLAGS --enable-debug=2 --disable-optimizations)
 else()
     set(FFMPEG_OPTIMIZATION_FLAGS --disable-debug "--extra-cflags=-ffunction-sections")
@@ -23,7 +23,7 @@ ExternalProject_Add(ffmpeg
         --enable-muxer=rtsp --enable-muxer=mpegts
         --enable-filter=scale_vaapi --enable-filter=hwupload --enable-filter=hwmap
         --enable-protocol=file --enable-protocol=rtp
-        --enable-libdrm --disable-xlib --disable-vdpau --prefix=<INSTALL_DIR>
+        --enable-libdrm --disable-xlib --disable-vdpau --disable-asm --prefix=<INSTALL_DIR>
         ${FFMPEG_OPTIMIZATION_FLAGS}
         BUILD_COMMAND     ${MAKE} -C <SOURCE_DIR>
         BUILD_ALWAYS      0
