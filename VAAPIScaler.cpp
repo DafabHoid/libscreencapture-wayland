@@ -7,6 +7,7 @@
 #include "libavcommon.hpp"
 #include <cstdio>
 #include <chrono>
+#include <string>
 using namespace std::string_literals;
 
 extern "C"
