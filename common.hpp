@@ -108,7 +108,9 @@ struct MemoryFrame
 
 
 
+#ifndef NDEBUG
 SCW_EXPORT extern void dumpStackTrace(const char* filename = "trace.txt") noexcept;
+#endif
 
 
 

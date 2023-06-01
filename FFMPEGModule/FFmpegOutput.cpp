@@ -29,8 +29,9 @@ LibAVException::LibAVException(int errorCode, const char* messageFmtStr, ...)
 	if (n > 0 && n < sizeof(message))
 		std::vsnprintf(message + n, sizeof(message) - n, messageFmtStr, v_args);
 	va_end(v_args);
-
+#ifndef NDEBUG
 	dumpStackTrace();
+#endif
 }
 
 FFmpegOutput::FFmpegOutput(std::unique_ptr<ThreadedVAAPIScaler> scaler,

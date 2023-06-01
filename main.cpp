@@ -133,11 +133,11 @@ int main(int argc, char** argv)
 	}
 }
 
+#ifndef NDEBUG
 /** Dump a stack trace to the file at @param filename.
  * This function does not use the heap, and only opens a file descriptor for the output file. */
 void dumpStackTrace(const char* filename) noexcept
 {
-#ifndef NDEBUG
 	void* bt[50];
 	int num = backtrace(bt, sizeof(bt)/sizeof(bt[0]));
 	// write the stack trace if it was successful and includes more than this function's frame
@@ -155,5 +155,5 @@ void dumpStackTrace(const char* filename) noexcept
 			close(fd);
 		}
 	}
-#endif
 }
+#endif

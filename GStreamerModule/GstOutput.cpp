@@ -204,8 +204,9 @@ GStreamerException::GStreamerException(const char* messageFmtStr, ...) noexcept
 	va_start(v_args, messageFmtStr);
 	std::vsnprintf(message, sizeof(message), messageFmtStr, v_args);
 	va_end(v_args);
-
+#ifndef NDEBUG
 	dumpStackTrace();
+#endif
 }
 
 }
