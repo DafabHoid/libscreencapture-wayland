@@ -16,7 +16,7 @@ option(ENABLE_FFMPEG_MODULE "Enable the FFmpeg encoder module" ON)
 option(ENABLE_GSTREAMER_MODULE "Enable the GStreamer encoder module" ON)
 option(BUILD_SHARED_LIBS "Build a shared library instead of a static one" OFF)
 option(BUILD_FFMPEG "Build own ffmpeg libraries instead of using system-provided ones" OFF)
-option(USE_LIBC++ "Use libc++ as C++ standard library instead of libstdc++ when compiling with clang" ON)
+option(USE_LIBC++ "Use libc++ as C++ standard library instead of libstdc++ when compiling with clang" OFF)
 # use static C++ library by default to reduce possible ABI breakages at runtime
 option(STATIC_LIBSTDC++ "Link with static C++ standard library" ON)
 
@@ -110,7 +110,13 @@ if(ENABLE_PORTAL_MODULE)
             xdg-desktop-portal.cpp xdg-desktop-portal.hpp
             include/module-portal.h)
     target_include_directories(screencapture-module-portal PUBLIC include/)
-    target_link_libraries(screencapture-module-portal PUBLIC sdbus-c++)
+    if(BUILD_SHARED_LIBS)
+        target_link_libraries(screencapture-module-portal PRIVATE sdbus-c++)
+    else()
+        # for a static library, propagate this dependency to anyone linking against us, because
+        # linking a static library (this) against another one (sdbus-c++) does not do anything
+        target_link_libraries(screencapture-module-portal PUBLIC sdbus-c++)
+    endif()
     set_property(TARGET screencapture-module-portal PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
 
     target_link_libraries(screencapture-wayland PUBLIC screencapture-module-portal)
