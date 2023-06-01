@@ -161,7 +161,7 @@ std::pair<int,uint32_t> getPipeWireShareInfo(sdbus::IConnection& connection, Cur
 	             interfaceVersion, cursorModes, screenCastSources);
 
 	// generate session name with random characters
-	auto charGenerator = std::uniform_int_distribution('a', 'z');
+	auto charGenerator = std::uniform_int_distribution<unsigned char>('a', 'z');
 	auto seed = std::default_random_engine{std::random_device()()};
 	std::array<char, 20> sessionName;
 	std::generate(sessionName.begin(), sessionName.end()-1, [&] () { return charGenerator(seed); });
