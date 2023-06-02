@@ -13,7 +13,7 @@ set(CMAKE_CXX_EXTENSIONS False)
 option(ENABLE_PORTAL_MODULE "Enable the xdg-desktop-portal module" ON)
 option(ENABLE_PIPEWIRE_MODULE "Enable the PipeWire module" ON)
 option(ENABLE_FFMPEG_MODULE "Enable the FFmpeg encoder module" ON)
-option(ENABLE_GSTREAMER_MODULE "Enable the GStreamer encoder module" ON)
+option(ENABLE_GSTREAMER_MODULE "Enable the GStreamer encoder module" OFF)
 option(BUILD_SHARED_LIBS "Build a shared library instead of a static one" OFF)
 option(BUILD_FFMPEG "Build own ffmpeg libraries instead of using system-provided ones" OFF)
 # use static C++ library by default to reduce possible ABI breakages at runtime

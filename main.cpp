@@ -1,7 +1,7 @@
 #include <pipewire/pipewire.h>
 #include "PipeWireModule/PipeWireStream.hpp"
 #include "PortalModule/xdg-desktop-portal.hpp"
-#include "GStreamerModule/GstOutput.hpp"
+#include "FFMPEGModule/FFmpegOutput.hpp"
 #include <cstdio>
 #include <unistd.h>
 #include <csignal>
@@ -96,12 +96,11 @@ int main(int argc, char** argv)
 		printf("SharedScreen fd = %d, node = %u\n", shareInfo.value().pipeWireFd, shareInfo.value().pipeWireNode);
 		pw_init(&argc, &argv);
 
-		gst_init(&argc, &argv);
 
 		{
 			class Stream2FFmpeg : public pw::StreamCallbacks
 			{
-				std::unique_ptr<gstreamer::GstOutput> gstOutput;
+				std::unique_ptr<ffmpeg::FFmpegOutput> ffmpegOutput;
 				const char* hardwareDevice;
 				const char* outputFormat;
 				const char* outputPath;
@@ -115,28 +114,31 @@ int main(int argc, char** argv)
 
 				void streamConnected(pw::Rect dimensions, pw::PixelFormat format, bool isDmaBuf) override
 				{
-					auto builder = gstreamer::GstOutput::Builder(dimensions, format);
+					auto builder = ffmpeg::FFmpegOutput::Builder(dimensions, format, isDmaBuf);
 					builder
 						.withScaling(common::Rect {1920u, 1080u})
 						.withHWDevice(hardwareDevice)
 						.withOutputFormat(outputFormat)
 						.withOutputPath(outputPath);
-					gstOutput = std::make_unique<gstreamer::GstOutput>(builder.build());
+					ffmpegOutput = std::make_unique<ffmpeg::FFmpegOutput>(builder.build());
 				}
 				void streamDisconnected() override
 				{
-					gstOutput.reset();
+					ffmpegOutput.reset();
 				}
 				void pushMemoryFrame(std::unique_ptr<pw::MemoryFrame> frame) override
 				{
-					gstOutput->pushFrame(std::move(frame));
+					auto avFrame = ffmpeg::wrapInAVFrame(std::move(frame));
+					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap (avFrame));
 				}
 				void pushDmaBufFrame(std::unique_ptr<pw::DmaBufFrame> frame) override
 				{
+					auto avFrame = ffmpeg::wrapInAVFrame(std::move(frame));
+					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap (avFrame));
 				}
 			};
 			Stream2FFmpeg stream2FFmpeg(hardwareDevicePath, outputFormat, outputPath);
-			auto pwStream = pw::PipeWireStream(shareInfo.value(), stream2FFmpeg, false);
+			auto pwStream = pw::PipeWireStream(shareInfo.value(), stream2FFmpeg, true);
 
 			// start thread to wait for a terminate signal for a graceful shutdown
 			std::thread signalHandlerThread([&pwStream]() { quitPwStreamOnTerminateSignal(pwStream); });
@@ -154,7 +156,6 @@ int main(int argc, char** argv)
 			}
 		}
 
-		gst_deinit();
 		pw_deinit();
 		return 0;
 	}
