@@ -4,6 +4,8 @@
 #include "GStreamerModule/GstOutput.hpp"
 #include <cstdio>
 #include <unistd.h>
+#include <csignal>
+#include <thread>
 
 #ifndef NDEBUG
 #include <execinfo.h>
@@ -17,6 +19,19 @@ static void printUsage(const char* argv0)
 	printf("Usage: %s [-c] -f <output format> -o <output path> -d <hardware device path>\n", argv0);
 	puts("\tWhere <hardware device path> is a DRM render node like /dev/dri/renderD128");
 	puts("\tWhere <output format> and <output path> can be any string that is recognized by ffmpeg");
+}
+
+static void quitPwStreamOnTerminateSignal(pw::PipeWireStream& pwStream)
+{
+	sigset_t signalsToWaitFor;
+	sigemptyset(&signalsToWaitFor);
+	sigaddset(&signalsToWaitFor, SIGINT);
+	sigaddset(&signalsToWaitFor, SIGTERM);
+	int sig = 0;
+	sigwait(&signalsToWaitFor, &sig);
+
+	printf("Stopping stream...\n");
+	pwStream.quit();
 }
 
 int main(int argc, char** argv)
@@ -60,6 +75,13 @@ int main(int argc, char** argv)
 		printUsage(argv[0]);
 		return 1;
 	}
+
+	// Block both of these signals, so they don't get delivered except to to a separate thread created later
+	sigset_t procset;
+	sigemptyset(&procset);
+	sigaddset(&procset, SIGINT);
+	sigaddset(&procset, SIGTERM);
+	sigprocmask(SIG_BLOCK, &procset, nullptr);
 
 	try
 	{
@@ -115,7 +137,21 @@ int main(int argc, char** argv)
 			};
 			Stream2FFmpeg stream2FFmpeg(hardwareDevicePath, outputFormat, outputPath);
 			auto pwStream = pw::PipeWireStream(shareInfo.value(), stream2FFmpeg, false);
-			pwStream.runStreamLoop();
+
+			// start thread to wait for a terminate signal for a graceful shutdown
+			std::thread signalHandlerThread([&pwStream]() { quitPwStreamOnTerminateSignal(pwStream); });
+
+			try
+			{
+				pwStream.runStreamLoop();
+				// raise signal ourselves to unblock the thread if it is still running
+				std::raise(SIGTERM);
+				signalHandlerThread.join();
+			} catch(...) {
+				std::raise(SIGTERM);
+				signalHandlerThread.join();
+				throw;
+			}
 		}
 
 		gst_deinit();

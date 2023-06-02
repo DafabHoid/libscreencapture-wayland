@@ -13,19 +13,11 @@
 #include <stdexcept> // runtime_error
 #include <algorithm> // max
 #include <libdrm/drm_fourcc.h>
-#include <signal.h> // sigaction
 
 using namespace std::chrono;
 
 namespace pw
 {
-
-static volatile bool globalStopFlag = false;
-
-static void setGlobalStopFlag(int)
-{
-	globalStopFlag = true;
-}
 
 void quit(pw::StreamInfo* si, std::exception_ptr ep)
 {
@@ -72,12 +64,6 @@ void processFrame(void* userData) noexcept
 	auto si = static_cast<pw::StreamInfo*>(userData);
 	if (pw_stream_get_state(si->stream, nullptr) != PW_STREAM_STATE_STREAMING)
 		return;
-	if (globalStopFlag)
-	{
-		printf("Stopping stream...\n");
-		quit(si, 0);
-		return;
-	}
 
 	pw_buffer* b = pw_stream_dequeue_buffer(si->stream);
 	if (!b) {
@@ -374,13 +360,6 @@ PipeWireStream::PipeWireStream(const SharedScreen& shareInfo,
 	{
 		throw std::runtime_error("Stream connect failed");
 	}
-
-	// register a signal handler for a graceful shutdown
-	struct sigaction sigIntHandler {};
-	sigemptyset(&sigIntHandler.sa_mask);
-	sigIntHandler.sa_handler = &setGlobalStopFlag;
-	sigaction(SIGINT, &sigIntHandler, nullptr);
-	sigaction(SIGTERM, &sigIntHandler, nullptr);
 }
 
 PipeWireStream::~PipeWireStream() noexcept
