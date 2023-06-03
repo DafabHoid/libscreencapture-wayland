@@ -57,7 +57,6 @@ void FFmpegOutput::pushFrame(AVFrame_Heap frame)
 {
 	if (muxer->requiresStrictMonotonicTimestamps())
 	{
-		// If the output format requires strict timestamps, skip frames which are not strictly monotonic
 		if (lastPts >= frame->pts) [[unlikely]]
 		{
 			av_log(nullptr, AV_LOG_DEBUG, "Dropping frame with non-strictly monotonic timestamp:"
@@ -80,13 +79,18 @@ AVFrame* wrapInAVFrame(std::unique_ptr<MemoryFrame> frame) noexcept
 	f->linesize[0] = frame->stride;
 	f->pts = duration_cast<microseconds>(frame->pts).count();
 
+	// custom deleter frees the MemoryFrame which owns the memory of this AVFrame
 	auto frameDeleter = [](void* u, uint8_t*)
 	{
 		auto f = static_cast<MemoryFrame*>(u);
 		delete f;
 	};
-	// create a dummy AVBuffer so reference counting works, but do not let it free the memory we don't own
+	// create a dummy AVBuffer so reference counting works, but supply our own deleter so it
+	// - won't free the memory in f->data[0] we don't own
+	// - deletes the MemoryFrame object actually owning the memory
 	f->buf[0] = av_buffer_create(static_cast<uint8_t*>(frame->memory), frame->size, frameDeleter, frame.get(), AV_BUFFER_FLAG_READONLY);
+
+	// release from unique_ptr, it is now owned by f->buf[0]
 	frame.release();
 	return f;
 }
@@ -119,7 +123,7 @@ AVFrame* wrapInAVFrame(std::unique_ptr<DmaBufFrame> frame) noexcept
 	f->height = frame->height;
 	f->pts = duration_cast<microseconds>(frame->pts).count();
 
-	// make sure reference counting works and the frame is deleted when no longer needed
+	// custom deleter frees the DmaBufFrame which owns the file descriptor of this AVFrame
 	auto frameDeleter = [](void* userData, uint8_t* bufData)
 	{
 		auto f = static_cast<DmaBufFrame*>(userData);
@@ -127,7 +131,14 @@ AVFrame* wrapInAVFrame(std::unique_ptr<DmaBufFrame> frame) noexcept
 		auto d = reinterpret_cast<AVDRMFrameDescriptor*>(bufData);
 		delete d;
 	};
-	f->buf[0] = av_buffer_create(f->data[0], 0, frameDeleter, frame.release(), AV_BUFFER_FLAG_READONLY);
+
+	// create a dummy AVBuffer so reference counting works, but supply our own deleter so it
+	// - won't free the memory in f->data[0] with av_free() but with operator delete
+	// - deletes the DmaBufFrame object owning the file descriptor
+	f->buf[0] = av_buffer_create(f->data[0], 0, frameDeleter, frame.get(), AV_BUFFER_FLAG_READONLY);
+
+	// release from unique_ptr, it is now owned by f->buf[0]
+	frame.release();
 	return f;
 }
 

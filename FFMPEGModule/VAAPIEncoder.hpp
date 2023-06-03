@@ -46,9 +46,6 @@ public:
 
 using ThreadedVAAPIEncoder = ThreadedWrapper<VAAPIEncoder>;
 
-// declare external instantiation for template
-//extern template class ThreadedWrapper<VAAPIEncoder>;
-
 }
 
 

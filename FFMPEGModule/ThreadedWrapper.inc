@@ -42,10 +42,7 @@ ThreadedWrapper<FrameProcessor>::~ThreadedWrapper() noexcept
 {
 	queue.signalEOF();
 	if (thread.joinable())
-	{
-		[[likely]]
 		thread.join();
-	}
 }
 
 
