@@ -72,4 +72,9 @@ void Muxer::writePacket(AVPacket& p)
 		throw LibAVException(err, "Writing packet failed");
 }
 
+bool Muxer::requiresStrictMonotonicTimestamps() const noexcept
+{
+	return !(formatContext->oformat->flags & AVFMT_TS_NONSTRICT);
+}
+
 }

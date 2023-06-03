@@ -22,6 +22,7 @@ class FFmpegOutput
 	std::unique_ptr<Muxer> muxer;
 	std::unique_ptr<ThreadedVAAPIEncoder> encoder;
 	std::unique_ptr<ThreadedVAAPIScaler> scaler;
+	int64_t lastPts;
 
 	FFmpegOutput(
 			std::unique_ptr<ThreadedVAAPIScaler> scaler,

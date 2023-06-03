@@ -39,7 +39,8 @@ FFmpegOutput::FFmpegOutput(std::unique_ptr<ThreadedVAAPIScaler> scaler,
                            std::unique_ptr<Muxer> muxer) noexcept
 : muxer(std::move(muxer)),
   encoder(std::move(encoder)),
-  scaler(std::move(scaler))
+  scaler(std::move(scaler)),
+  lastPts{}
 {
 	this->encoder->setFrameProcessedCallback([muxer = this->muxer.get()](AVPacket& p)
 	{
@@ -54,6 +55,18 @@ FFmpegOutput::FFmpegOutput(std::unique_ptr<ThreadedVAAPIScaler> scaler,
 
 void FFmpegOutput::pushFrame(AVFrame_Heap frame)
 {
+	if (muxer->requiresStrictMonotonicTimestamps())
+	{
+		// If the output format requires strict timestamps, skip frames which are not strictly monotonic
+		if (lastPts >= frame->pts) [[unlikely]]
+		{
+			av_log(nullptr, AV_LOG_DEBUG, "Dropping frame with non-strictly monotonic timestamp:"
+			                              "pts = %" PRIi64 ", previous pts: %" PRIi64 "\n",
+			       frame->pts, lastPts);
+			return;
+		}
+		lastPts = frame->pts;
+	}
 	scaler->processFrame(std::move(frame));
 }
 

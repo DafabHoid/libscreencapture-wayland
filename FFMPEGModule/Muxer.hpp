@@ -27,6 +27,8 @@ public:
 	SCW_EXPORT ~Muxer() noexcept;
 
 	SCW_EXPORT void writePacket(AVPacket& p);
+
+	SCW_EXPORT bool requiresStrictMonotonicTimestamps() const noexcept;
 };
 
 }
