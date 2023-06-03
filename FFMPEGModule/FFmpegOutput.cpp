@@ -73,7 +73,8 @@ AVFrame* wrapInAVFrame(std::unique_ptr<MemoryFrame> frame) noexcept
 		delete f;
 	};
 	// create a dummy AVBuffer so reference counting works, but do not let it free the memory we don't own
-	f->buf[0] = av_buffer_create(static_cast<uint8_t*>(frame->memory), frame->size, frameDeleter, frame.release(), AV_BUFFER_FLAG_READONLY);
+	f->buf[0] = av_buffer_create(static_cast<uint8_t*>(frame->memory), frame->size, frameDeleter, frame.get(), AV_BUFFER_FLAG_READONLY);
+	frame.release();
 	return f;
 }
 
