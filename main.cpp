@@ -4,7 +4,7 @@
 #include "FFMPEGModule/FFmpegOutput.hpp"
 #include <cstdio>
 #include <unistd.h>
-#include <csignal>
+#include <signal.h>
 #include <thread>
 
 #ifndef NDEBUG
@@ -147,10 +147,10 @@ int main(int argc, char** argv)
 			{
 				pwStream.runStreamLoop();
 				// raise signal ourselves to unblock the thread if it is still running
-				std::raise(SIGTERM);
+				kill(0, SIGTERM);
 				signalHandlerThread.join();
 			} catch(...) {
-				std::raise(SIGTERM);
+				kill(0, SIGTERM);
 				signalHandlerThread.join();
 				throw;
 			}
