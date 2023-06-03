@@ -32,14 +32,6 @@ VAAPIScaler::VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targe
 	const AVFilter* buffersrc = avfilter_get_by_name("buffer");
 	const AVFilter* buffersink = avfilter_get_by_name("buffersink");
 
-	if (!inputIsDRMPrime)
-	{
-		// fix for hwupload on intel graphics:
-		// libva-intel claims to not support BGRA but only BGR0, even though it can import BGRA via DMABuf
-		if (sourceFormat == AV_PIX_FMT_BGRA)
-			sourceFormat = AV_PIX_FMT_BGR0;
-	}
-
 	// create source for filter graph
 	// the arguments provide information to the graph about what its input will look like
 	char args[128];
