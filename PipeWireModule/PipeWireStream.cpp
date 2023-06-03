@@ -304,6 +304,20 @@ static const spa_pod* buildStreamParams(spa_pod_builder& b, bool withDMABuf)
 		spa_pod_builder_long(&b, I915_FORMAT_MOD_Yf_TILED);
 		spa_pod_builder_long(&b, I915_FORMAT_MOD_Y_TILED_CCS);
 		spa_pod_builder_long(&b, I915_FORMAT_MOD_Yf_TILED_CCS);
+
+		spa_pod_builder_long(&b, AMD_FMT_MOD|AMD_FMT_MOD_SET(TILE_VERSION, 0));
+		spa_pod_builder_long(&b, AMD_FMT_MOD
+		                         | AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX9)
+								 | AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_S));
+		spa_pod_builder_long(&b, AMD_FMT_MOD
+		                         | AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX10)
+		                         | AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_S));
+		spa_pod_builder_long(&b, AMD_FMT_MOD
+		                         | AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX10_RBPLUS)
+		                         | AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_S));
+		spa_pod_builder_long(&b, AMD_FMT_MOD
+		                         | AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX11)
+		                         | AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_S));
 		spa_pod_builder_long(&b, DRM_FORMAT_MOD_INVALID);
 		spa_pod_builder_pop(&b, &f2);
 	}
