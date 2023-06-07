@@ -29,7 +29,7 @@ public:
 
 	using CallbackType = EncodedCallback;
 
-	VAAPIEncoder(unsigned int width, unsigned int height, AVDictionary* codecOptions, AVBufferRef* hwDevice);
+	VAAPIEncoder(unsigned int width, unsigned int height, AVDictionary* codecOptions, AVBufferRef* hwDevice, Codec codec);
 	VAAPIEncoder(VAAPIEncoder&&) noexcept;
 	VAAPIEncoder(const VAAPIEncoder&) = delete;
 	~VAAPIEncoder() noexcept;

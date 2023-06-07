@@ -159,7 +159,8 @@ FFmpegOutput::Builder::Builder(Rect sourceSize, PixelFormat sourceFormat, bool i
   sourceFormat(sourceFormat),
   isSourceDrmPrime(isDrmPrime),
   targetSize(sourceSize),
-  codecOptions{}
+  codecOptions{},
+  codec(Codec::H264)
 {
 }
 
@@ -200,7 +201,7 @@ FFmpegOutput FFmpegOutput::Builder::build()
 		if (r < 0)
 			throw LibAVException(r, "Creating a VAAPI device from DRM node failed");
 
-		auto encoder = std::make_unique<ThreadedVAAPIEncoder>(targetSize.w, targetSize.h, codecOptions, vaapiDevice);
+		auto encoder = std::make_unique<ThreadedVAAPIEncoder>(targetSize.w, targetSize.h, codecOptions, vaapiDevice, codec);
 
 		auto muxer = std::make_unique<Muxer>(outputPath,
 				outputFormat, encoder->unwrap().getCodecContext());

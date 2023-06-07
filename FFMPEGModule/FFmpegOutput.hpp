@@ -40,6 +40,7 @@ public:
 		bool isSourceDrmPrime;
 		Rect targetSize;
 		AVDictionary* codecOptions;
+		Codec codec;
 		std::string outputFormat;
 		std::string outputPath;
 		std::string hwDevicePath;
@@ -56,6 +57,12 @@ public:
 		SCW_EXPORT Builder& withScaling(Rect scaledSize) noexcept
 		{
 			targetSize = scaledSize;
+			return *this;
+		}
+
+		SCW_EXPORT Builder& withCodec(Codec c) noexcept
+		{
+			codec = c;
 			return *this;
 		}
 

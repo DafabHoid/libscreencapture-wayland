@@ -12,12 +12,23 @@ using namespace std::chrono_literals;
 namespace ffmpeg
 {
 
-VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVDictionary* codecOptions, AVBufferRef* hwDevice)
+[[gnu::pure]]
+static const char* encoderName(Codec c)
+{
+	switch (c)
+	{
+	case Codec::H264: return "h264_vaapi";
+	case Codec::HEVC: return "hevc_vaapi";
+	case Codec::VP9: return "vp9_vaapi";
+	}
+}
+
+VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVDictionary* codecOptions, AVBufferRef* hwDevice, Codec requestedCodec)
 : encodedFrame(av_packet_alloc())
 {
-	codec = avcodec_find_encoder_by_name("h264_vaapi");
+	codec = avcodec_find_encoder_by_name(encoderName(requestedCodec));
 	if (codec == nullptr)
-		throw LibAVException(AVERROR(ENXIO), "no encoder named \"h264_vaapi\" found");
+		throw LibAVException(AVERROR(ENXIO), "no encoder named \"%s\" found", encoderName(requestedCodec));
 
 	AVBufferRef* hwFramesContext = av_hwframe_ctx_alloc(hwDevice);
 	AVHWFramesContext* hwCtx = reinterpret_cast<AVHWFramesContext*>(hwFramesContext->data);

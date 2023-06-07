@@ -44,6 +44,13 @@ static constexpr inline AVPixelFormat pixelFormat2AV(PixelFormat format)
 	}
 }
 
+enum class Codec
+{
+	H264,
+	HEVC,
+	VP9,
+};
+
 SCW_EXPORT AVFrame* wrapInAVFrame(std::unique_ptr<MemoryFrame> frame) noexcept;
 SCW_EXPORT AVFrame* wrapInAVFrame(std::unique_ptr<DmaBufFrame> frame) noexcept;
 
