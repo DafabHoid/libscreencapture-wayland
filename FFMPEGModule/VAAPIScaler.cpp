@@ -35,7 +35,7 @@ VAAPIScaler::VAAPIScaler(Rect sourceSize, AVPixelFormat sourceFormat, Rect targe
 	// create source for filter graph
 	// the arguments provide information to the graph about what its input will look like
 	char args[128];
-	std::snprintf(args, sizeof(args), "video_size=%dx%d:pix_fmt=%d:time_base=1/%lld:pixel_aspect=1/1",
+	std::snprintf(args, sizeof(args), "video_size=%dx%d:pix_fmt=%d:time_base=1/%" PRIu64 ":pixel_aspect=1/1",
 	              sourceSize.w, sourceSize.h,
 	              inputIsDRMPrime ? AV_PIX_FMT_DRM_PRIME : sourceFormat,
 	              std::chrono::duration_cast<std::chrono::microseconds>(1s).count());

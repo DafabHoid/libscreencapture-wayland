@@ -131,9 +131,10 @@ void processFrame(void* userData) noexcept
 		}
 		else if (d.type == SPA_DATA_DmaBuf)
 		{
+			// No DRM format uses more than 4 planes, so ignore higher values (DmaBufFrame only supports 4 planes)
 			unsigned int planeCount = std::min(b->buffer->n_datas, 4u);
 			printf("DMA-BUF info: fd = %ld, size = %x, totalSize = %x, stride = %x, planeCount = %u, offset = %x\n",
-			       d.fd, d.chunk->size, d.maxsize, d.chunk->stride, planeCount, d.chunk->offset);
+			       d.fd, d.chunk->size, d.maxsize, d.chunk->stride, b->buffer->n_datas, d.chunk->offset);
 
 			auto f = std::make_unique<DmaBufFrame>();
 			f->width = si->format.info.raw.size.width;
@@ -143,7 +144,7 @@ void processFrame(void* userData) noexcept
 			f->drmObject = {
 					.fd = static_cast<int>(b->buffer->datas[0].fd),
 					.totalSize = b->buffer->datas[0].maxsize,
-					.modifier = static_cast<uint64_t>(si->format.info.raw.modifier),
+					.modifier = si->format.info.raw.modifier,
 			};
 			f->planeCount = planeCount;
 			f->onFrameDone = [si, b]()

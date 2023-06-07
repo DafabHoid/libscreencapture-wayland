@@ -148,7 +148,6 @@ static void initFFmpeg() noexcept
 	av_log_set_level(AV_LOG_VERBOSE);
 #endif
 
-	int r;
 #if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(58, 9, 100)
 	avcodec_register_all();
 #endif
