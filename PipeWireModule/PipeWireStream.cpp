@@ -111,8 +111,10 @@ void processFrame(void* userData) noexcept
 		spa_data& d = b->buffer->datas[0];
 		if (d.type == SPA_DATA_MemPtr || d.type == SPA_DATA_MemFd)
 		{
+#ifndef NDEBUG
 			printf("Memory-mapped buffer info: size = %x, stride = %x, ptr = %p\n",
 			       d.chunk->size, d.chunk->stride, d.data);
+#endif
 			assert(b->buffer->n_datas == 1);
 			auto f = std::make_unique<MemoryFrame>();
 			f->width = si->format.info.raw.size.width;
@@ -133,8 +135,10 @@ void processFrame(void* userData) noexcept
 		{
 			// No DRM format uses more than 4 planes, so ignore higher values (DmaBufFrame only supports 4 planes)
 			unsigned int planeCount = std::min(b->buffer->n_datas, 4u);
+#ifndef NDEBUG
 			printf("DMA-BUF info: fd = %ld, size = %x, totalSize = %x, stride = %x, planeCount = %u, offset = %x\n",
 			       d.fd, d.chunk->size, d.maxsize, d.chunk->stride, b->buffer->n_datas, d.chunk->offset);
+#endif
 
 			auto f = std::make_unique<DmaBufFrame>();
 			f->width = si->format.info.raw.size.width;

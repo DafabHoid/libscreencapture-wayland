@@ -104,6 +104,8 @@ int main(int argc, char** argv)
 				const char* hardwareDevice;
 				const char* outputFormat;
 				const char* outputPath;
+				std::chrono::time_point<std::chrono::steady_clock> lastFpsTS;
+				int frameCountThisSecond;
 
 			public:
 				inline Stream2FFmpeg(const char* hardwareDevice, const char* outputFormat, const char* outputPath)
@@ -121,6 +123,8 @@ int main(int argc, char** argv)
 						.withOutputFormat(outputFormat)
 						.withOutputPath(outputPath);
 					ffmpegOutput = std::make_unique<ffmpeg::FFmpegOutput>(builder.build());
+					lastFpsTS = std::chrono::steady_clock::now();
+					frameCountThisSecond = 0;
 				}
 				void streamDisconnected() override
 				{
@@ -130,11 +134,24 @@ int main(int argc, char** argv)
 				{
 					auto avFrame = ffmpeg::wrapInAVFrame(std::move(frame));
 					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap (avFrame));
+					updateFpsCounter();
 				}
 				void processDmaBufFrame(std::unique_ptr<pw::DmaBufFrame> frame) override
 				{
 					auto avFrame = ffmpeg::wrapInAVFrame(std::move(frame));
 					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap (avFrame));
+					updateFpsCounter();
+				}
+				void updateFpsCounter()
+				{
+					auto now = std::chrono::steady_clock::now();
+					if (now - lastFpsTS >= std::chrono::seconds(1))
+					{
+						printf("fps: %d\n", frameCountThisSecond);
+						lastFpsTS = now;
+						frameCountThisSecond = 0;
+					}
+					++frameCountThisSecond;
 				}
 			};
 			Stream2FFmpeg stream2FFmpeg(hardwareDevicePath, outputFormat, outputPath);
