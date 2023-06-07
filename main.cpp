@@ -126,12 +126,12 @@ int main(int argc, char** argv)
 				{
 					ffmpegOutput.reset();
 				}
-				void pushMemoryFrame(std::unique_ptr<pw::MemoryFrame> frame) override
+				void processMemoryFrame(std::unique_ptr<pw::MemoryFrame> frame) override
 				{
 					auto avFrame = ffmpeg::wrapInAVFrame(std::move(frame));
 					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap (avFrame));
 				}
-				void pushDmaBufFrame(std::unique_ptr<pw::DmaBufFrame> frame) override
+				void processDmaBufFrame(std::unique_ptr<pw::DmaBufFrame> frame) override
 				{
 					auto avFrame = ffmpeg::wrapInAVFrame(std::move(frame));
 					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap (avFrame));

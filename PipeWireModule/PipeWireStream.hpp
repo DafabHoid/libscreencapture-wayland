@@ -26,7 +26,7 @@ class StreamCallbacks
 public:
 	/** This callback function is called after the PipeWire stream became connected.
 	 * You should use it to set up a consumer that processes the frames given to you by
-	 * the pushMemoryFrame/pushDmaBufFrame functions.
+	 * the processMemoryFrame/processDmaBufFrame functions.
 	 *
 	 * A stream can either provide the frames in conventional memory or as a reference to GPU memory.
 	 * The @em isDmaBuf parameter tells you what type it is. The appropriate pushFrame function is called
@@ -47,13 +47,12 @@ public:
 	/** This callback function is called for every frame in the PipeWire stream, if the stream uses
 	 * conventional memory. Remember to keep a reference to this frame while using its pixel data.
 	 * @param frame the frame data including its dimensions, format and a pointer to pixel data */
-	virtual void pushMemoryFrame(std::unique_ptr<MemoryFrame> frame) = 0;
+	virtual void processMemoryFrame(std::unique_ptr<MemoryFrame> frame) = 0;
 
 	/** This callback function is called for every frame in the PipeWire stream, if the stream uses
 	 * DmaBuf (GPU) memory. Remember to keep a reference to this frame while using its file descriptor.
-	 * @param frame the frame data including its dimensions, format and a DRM PRIME file descriptor
-	 * @param cb a callback function to call when you are done using the frame data, to release its resources */
-	virtual void pushDmaBufFrame(std::unique_ptr<DmaBufFrame> frame) = 0;
+	 * @param frame the frame data including its dimensions, format and a DRM PRIME file descriptor */
+	virtual void processDmaBufFrame(std::unique_ptr<DmaBufFrame> frame) = 0;
 
 };
 

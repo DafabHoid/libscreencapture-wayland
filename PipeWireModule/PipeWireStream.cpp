@@ -127,7 +127,7 @@ void processFrame(void* userData) noexcept
 			{
 				pw_stream_queue_buffer(si->stream, b);
 			};
-			si->mainLoopInfo->streamCallbacks.pushMemoryFrame(std::move(f));
+			si->mainLoopInfo->streamCallbacks.processMemoryFrame(std::move(f));
 		}
 		else if (d.type == SPA_DATA_DmaBuf)
 		{
@@ -157,7 +157,7 @@ void processFrame(void* userData) noexcept
 				plane.offset = chunk.offset;
 				plane.pitch = chunk.stride;
 			}
-			si->mainLoopInfo->streamCallbacks.pushDmaBufFrame(std::move(f));
+			si->mainLoopInfo->streamCallbacks.processDmaBufFrame(std::move(f));
 		}
 	}
 	catch (const std::exception& e)
@@ -465,7 +465,7 @@ public:
 		delete cb;
 	}
 
-	void pushMemoryFrame(std::unique_ptr<pw::MemoryFrame> frame) override
+	void processMemoryFrame(std::unique_ptr<pw::MemoryFrame> frame) override
 	{
 		auto c_frame = static_cast<::MemoryFrame*>(calloc(1, sizeof(::MemoryFrame)));
 		c_frame->width = frame->width;
@@ -482,7 +482,7 @@ public:
 		c_callbacks->pushMemoryFrame(c_frame);
 	}
 
-	void pushDmaBufFrame(std::unique_ptr<pw::DmaBufFrame> frame) override
+	void processDmaBufFrame(std::unique_ptr<pw::DmaBufFrame> frame) override
 	{
 		auto c_frame = static_cast<::DmaBufFrame*>(calloc(1, sizeof(::DmaBufFrame)));
 		c_frame->width = frame->width;
