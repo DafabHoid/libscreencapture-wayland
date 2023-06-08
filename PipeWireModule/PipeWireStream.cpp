@@ -319,10 +319,29 @@ static const spa_pod* buildStreamParams(spa_pod_builder& b, bool withDMABuf)
 		                         | AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_S));
 		spa_pod_builder_long(&b, AMD_FMT_MOD
 		                         | AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX10_RBPLUS)
-		                         | AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_S));
+		                         | AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_R_X)
+		                         | AMD_FMT_MOD_SET(PIPE_XOR_BITS, 4)
+		                         | AMD_FMT_MOD_SET(PACKERS, 3));
 		spa_pod_builder_long(&b, AMD_FMT_MOD
-		                         | AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX11)
-		                         | AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_S));
+		                         | AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX10_RBPLUS)
+		                         | AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_R_X)
+		                         | AMD_FMT_MOD_SET(DCC, 1)
+		                         | AMD_FMT_MOD_SET(DCC_RETILE, 1)
+		                         | AMD_FMT_MOD_SET(DCC_INDEPENDENT_128B, 1)
+		                         | AMD_FMT_MOD_SET(DCC_MAX_COMPRESSED_BLOCK, AMD_FMT_MOD_DCC_BLOCK_128B)
+		                         | AMD_FMT_MOD_SET(DCC_CONSTANT_ENCODE, 1)
+								 | AMD_FMT_MOD_SET(PIPE_XOR_BITS, 4)
+								 | AMD_FMT_MOD_SET(PACKERS, 3));
+		spa_pod_builder_long(&b, AMD_FMT_MOD
+		                         | AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX10_RBPLUS)
+		                         | AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_R_X)
+		                         | AMD_FMT_MOD_SET(DCC, 1)
+		                         | AMD_FMT_MOD_SET(DCC_RETILE, 0)
+		                         | AMD_FMT_MOD_SET(DCC_INDEPENDENT_128B, 1)
+		                         | AMD_FMT_MOD_SET(DCC_MAX_COMPRESSED_BLOCK, AMD_FMT_MOD_DCC_BLOCK_128B)
+		                         | AMD_FMT_MOD_SET(DCC_CONSTANT_ENCODE, 1)
+		                         | AMD_FMT_MOD_SET(PIPE_XOR_BITS, 4)
+		                         | AMD_FMT_MOD_SET(PACKERS, 3));
 		spa_pod_builder_long(&b, DRM_FORMAT_MOD_INVALID);
 		spa_pod_builder_pop(&b, &f2);
 	}
