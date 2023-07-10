@@ -165,6 +165,11 @@ FFmpegOutput::Builder::Builder(Rect sourceSize, PixelFormat sourceFormat, bool i
 {
 }
 
+FFmpegOutput::Builder::~Builder() noexcept
+{
+	av_dict_free(&codecOptions);
+}
+
 FFmpegOutput FFmpegOutput::Builder::build()
 {
 	if (sourceSize.w == 0 || sourceSize.h == 0)
@@ -202,7 +207,7 @@ FFmpegOutput FFmpegOutput::Builder::build()
 		if (r < 0)
 			throw LibAVException(r, "Creating a VAAPI device from DRM node failed");
 
-		auto encoder = std::make_unique<ThreadedVAAPIEncoder>(targetSize.w, targetSize.h, codecOptions, vaapiDevice, codec);
+		auto encoder = std::make_unique<ThreadedVAAPIEncoder>(targetSize.w, targetSize.h, &codecOptions, vaapiDevice, codec);
 
 		auto muxer = std::make_unique<Muxer>(outputPath,
 				outputFormat, encoder->unwrap().getCodecContext());

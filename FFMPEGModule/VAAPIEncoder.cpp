@@ -23,7 +23,7 @@ static const char* encoderName(Codec c)
 	}
 }
 
-VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVDictionary* codecOptions, AVBufferRef* hwDevice, Codec requestedCodec)
+VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVDictionary** codecOptions, AVBufferRef* hwDevice, Codec requestedCodec)
 : encodedFrame(av_packet_alloc())
 {
 	codec = avcodec_find_encoder_by_name(encoderName(requestedCodec));
@@ -51,7 +51,7 @@ VAAPIEncoder::VAAPIEncoder(unsigned int width, unsigned int height, AVDictionary
 	codecContext->flags |= AV_CODEC_FLAG_GLOBAL_HEADER; // provide codecContext->extradata for muxer instead of inside the packets
 	codecContext->hw_frames_ctx = hwFramesContext;
 
-	r = avcodec_open2(codecContext, codec, &codecOptions);
+	r = avcodec_open2(codecContext, codec, codecOptions);
 	if (r)
 		throw LibAVException(r, "Opening encoder failed");
 }

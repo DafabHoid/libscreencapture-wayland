@@ -56,6 +56,8 @@ public:
 		 */
 		SCW_EXPORT Builder(Rect sourceSize, PixelFormat sourceFormat, bool isDrmPrime) noexcept;
 
+		SCW_EXPORT ~Builder() noexcept;
+
 		/** Encode on the device at this path.
 		 * The default is {@code /dev/dri/renderD128}.
 		 * Currently only a DRM render node path is supported, like {@code /dev/dri/renderD128}. It must support encoding
@@ -86,11 +88,11 @@ public:
 		/** If you want to change any encoding parameters from their defaults, you can give a dictionary with options
 		 * to the encoder.
 		 * The available options depend on the codec and ffmpeg version, so see the ffmpeg documentation at {@a https://ffmpeg.org/ffmpeg-codecs.html}.
-		 * @param options A dictionary with options. This builder will take ownership of the object.
+		 * @param options A dictionary with options. This builder will create a copy.
 		 */
-		SCW_EXPORT Builder& withCodecOptions(AVDictionary* options) noexcept
+		SCW_EXPORT Builder& withCodecOptions(const AVDictionary* options) noexcept
 		{
-			codecOptions = options;
+			av_dict_copy(&codecOptions, options, 0);
 			return *this;
 		}
 
