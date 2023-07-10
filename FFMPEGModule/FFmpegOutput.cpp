@@ -160,7 +160,8 @@ FFmpegOutput::Builder::Builder(Rect sourceSize, PixelFormat sourceFormat, bool i
   isSourceDrmPrime(isDrmPrime),
   targetSize(sourceSize),
   codecOptions{},
-  codec(Codec::H264)
+  codec(Codec::H264),
+  hwDevicePath("/dev/dri/renderD128")
 {
 }
 
