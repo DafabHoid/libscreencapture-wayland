@@ -13,16 +13,48 @@
 extern "C"
 {
 #endif
+enum PipeWireStream_EventType
+{
+	PWSTREAM_EVENT_TYPE_CONNECTED,
+	PWSTREAM_EVENT_TYPE_DISCONNECTED,
+	PWSTREAM_EVENT_TYPE_MEMORY_FRAME_RECEIVED,
+	PWSTREAM_EVENT_TYPE_DMA_BUF_RECEIVED,
+};
+
+struct PipeWireStream_Event_Connect
+{
+	struct Rect dimensions;
+	enum PixelFormat format;
+	bool isDmaBuf;
+};
+struct PipeWireStream_Event_Disconnect
+{
+};
+struct PipeWireStream_Event_MemoryFrameReceived
+{
+	const struct MemoryFrame* frame;
+};
+struct PipeWireStream_Event_DmaBufFrameReceived
+{
+	const struct DmaBufFrame* frame;
+};
+
+struct PipeWireStream_Event
+{
+	enum PipeWireStream_EventType type;
+	union
+	{
+		struct PipeWireStream_Event_Connect connect;
+		struct PipeWireStream_Event_Disconnect disconnect;
+		struct PipeWireStream_Event_MemoryFrameReceived memoryFrameReceived;
+		struct PipeWireStream_Event_DmaBufFrameReceived dmaBufFrameReceived;
+	};
+};
 
 typedef struct
 {
-	void (*streamConnected)(const struct Rect* dimensions, enum PixelFormat format, bool isDmaBuf);
+	void (*processEvent)(const struct PipeWireStream_Event* e);
 
-	void (*streamDisconnected)();
-
-	void (*pushMemoryFrame)(const struct MemoryFrame* frame);
-
-	void (*pushDmaBufFrame)(const struct DmaBufFrame* frame);
 } StreamCallbacks_t;
 
 struct PipeWireStream;

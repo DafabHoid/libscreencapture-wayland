@@ -114,9 +114,15 @@ int main(int argc, char** argv)
 				  outputPath{outputPath}
 				{}
 
-				void streamConnected(pw::Rect dimensions, pw::PixelFormat format, bool isDmaBuf) override
+				void processEvent(pw::event::Event e) override
 				{
-					auto builder = ffmpeg::FFmpegOutput::Builder(dimensions, format, isDmaBuf);
+					// delegate event to type-matching operator method
+					std::visit(*this, e);
+				}
+
+				void operator()(pw::event::Connected& e)
+				{
+					auto builder = ffmpeg::FFmpegOutput::Builder(e.dimensions, e.format, e.isDmaBuf);
 					builder
 						.withScaling(common::Rect {1920u, 1080u})
 						.withHWDevice(hardwareDevice)
@@ -126,19 +132,19 @@ int main(int argc, char** argv)
 					lastFpsTS = std::chrono::steady_clock::now();
 					frameCountThisSecond = 0;
 				}
-				void streamDisconnected() override
+				void operator()(pw::event::Disconnected&)
 				{
 					ffmpegOutput.reset();
 				}
-				void processMemoryFrame(std::unique_ptr<pw::MemoryFrame> frame) override
+				void operator()(pw::event::MemoryFrameReceived& e)
 				{
-					auto avFrame = ffmpeg::wrapInAVFrame(std::move(frame));
+					auto avFrame = ffmpeg::wrapInAVFrame(std::move(e.frame));
 					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap (avFrame));
 					updateFpsCounter();
 				}
-				void processDmaBufFrame(std::unique_ptr<pw::DmaBufFrame> frame) override
+				void operator()(pw::event::DmaBufFrameReceived& e)
 				{
-					auto avFrame = ffmpeg::wrapInAVFrame(std::move(frame));
+					auto avFrame = ffmpeg::wrapInAVFrame(std::move(e.frame));
 					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap (avFrame));
 					updateFpsCounter();
 				}

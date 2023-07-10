@@ -129,7 +129,7 @@ void processFrame(void* userData) noexcept
 			{
 				pw_stream_queue_buffer(si->stream, b);
 			};
-			si->mainLoopInfo->streamCallbacks.processMemoryFrame(std::move(f));
+			si->mainLoopInfo->streamCallbacks.processEvent(event::MemoryFrameReceived{std::move(f)});
 		}
 		else if (d.type == SPA_DATA_DmaBuf)
 		{
@@ -162,7 +162,7 @@ void processFrame(void* userData) noexcept
 				plane.offset = chunk.offset;
 				plane.pitch = chunk.stride;
 			}
-			si->mainLoopInfo->streamCallbacks.processDmaBufFrame(std::move(f));
+			si->mainLoopInfo->streamCallbacks.processEvent(event::DmaBufFrameReceived{std::move(f)});
 		}
 	}
 	catch (const std::exception& e)
@@ -182,7 +182,11 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 		auto& raw = si->format.info.raw;
 		try
 		{
-			si->mainLoopInfo->streamCallbacks.streamConnected(Rect {raw.size.width, raw.size.height}, spa2pixelFormat(raw.format), si->haveDmaBuf);
+			si->mainLoopInfo->streamCallbacks.processEvent(event::Connected {
+				Rect {raw.size.width, raw.size.height},
+				spa2pixelFormat(raw.format),
+				si->haveDmaBuf
+			});
 		}
 		catch (const std::exception& e)
 		{
@@ -192,7 +196,7 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 	}
 	else if (old == PW_STREAM_STATE_STREAMING)
 	{
-		si->mainLoopInfo->streamCallbacks.streamDisconnected();
+		si->mainLoopInfo->streamCallbacks.processEvent(event::Disconnected{});
 		si->mainLoopInfo->quit();
 	}
 }
@@ -462,19 +466,32 @@ public:
 	: c_callbacks(toWrap)
 	{}
 
-	void streamConnected(pw::Rect dimensions, pw::PixelFormat format, bool isDmaBuf) override
+	void processEvent(pw::event::Event e) override
 	{
-		::Rect c_dimensions = {
-				dimensions.w,
-				dimensions.h
-		};
-		::PixelFormat c_format = toCFormat(format);
-		c_callbacks->streamConnected(&c_dimensions, c_format, isDmaBuf);
+		std::visit(*this, e);
 	}
 
-	void streamDisconnected() override
+	void operator()(pw::event::Connected& e)
 	{
-		c_callbacks->streamDisconnected();
+		::Rect c_dimensions = {
+				e.dimensions.w,
+				e.dimensions.h
+		};
+		::PixelFormat c_format = toCFormat(e.format);
+		PipeWireStream_Event c_e {
+				.type = PWSTREAM_EVENT_TYPE_CONNECTED,
+				.connect = {c_dimensions, c_format, e.isDmaBuf}
+		};
+		c_callbacks->processEvent(&c_e);
+	}
+
+	void operator()(pw::event::Disconnected& e)
+	{
+		PipeWireStream_Event c_e {
+				.type = PWSTREAM_EVENT_TYPE_DISCONNECTED,
+				.disconnect = {}
+		};
+		c_callbacks->processEvent(&c_e);
 	}
 
 	static void onMemoryFrameDoneWrapper(void* opaque) noexcept
@@ -489,8 +506,9 @@ public:
 		delete cb;
 	}
 
-	void processMemoryFrame(std::unique_ptr<pw::MemoryFrame> frame) override
+	void operator()(pw::event::MemoryFrameReceived& e)
 	{
+		std::unique_ptr<common::MemoryFrame>& frame = e.frame;
 		auto c_frame = static_cast<::MemoryFrame*>(calloc(1, sizeof(::MemoryFrame)));
 		c_frame->width = frame->width;
 		c_frame->height = frame->height;
@@ -503,11 +521,16 @@ public:
 		c_frame->opaque = frame.release();
 		c_frame->onFrameDone = &onMemoryFrameDoneWrapper;
 
-		c_callbacks->pushMemoryFrame(c_frame);
+		PipeWireStream_Event c_e {
+			.type = PWSTREAM_EVENT_TYPE_MEMORY_FRAME_RECEIVED,
+			.memoryFrameReceived = {c_frame}
+		};
+		c_callbacks->processEvent(&c_e);
 	}
 
-	void processDmaBufFrame(std::unique_ptr<pw::DmaBufFrame> frame) override
+	void operator()(pw::event::DmaBufFrameReceived& e)
 	{
+		std::unique_ptr<common::DmaBufFrame>& frame = e.frame;
 		auto c_frame = static_cast<::DmaBufFrame*>(calloc(1, sizeof(::DmaBufFrame)));
 		c_frame->width = frame->width;
 		c_frame->height = frame->height;
@@ -519,7 +542,11 @@ public:
 		c_frame->opaque = frame.release();
 		c_frame->onFrameDone = &onDmaBufFrameDoneWrapper;
 
-		c_callbacks->pushDmaBufFrame(c_frame);
+		PipeWireStream_Event c_e {
+				.type = PWSTREAM_EVENT_TYPE_DMA_BUF_RECEIVED,
+				.dmaBufFrameReceived = {c_frame}
+		};
+		c_callbacks->processEvent(&c_e);
 	}
 };
 

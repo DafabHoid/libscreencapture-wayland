@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <exception>
 #include <chrono>
+#include <variant>
 #include <pipewire/pipewire.h>
 #include <spa/param/video/format.h>
 
@@ -21,40 +22,72 @@ using common::MemoryFrame;
 using common::DmaBufFrame;
 using common::SharedScreen;
 
+namespace event
+{
+
+/** This event is the first you will receive once the PipeWire stream became connected.
+ * You should use it to set up a consumer that processes the frames given to you by
+ * the MemoryFrameReceived and DmaBufFrameReceived events.
+ *
+ * A stream can either provide the frames in conventional memory or as a reference to GPU memory.
+ * The @em isDmaBuf parameter tells you what type it is. The appropriate FrameReceived is sent
+ * for each type. */
+class Connected
+{
+public:
+	/** The width and height of the stream in pixels */
+	Rect dimensions;
+
+	/** The pixel format of each video frame */
+	PixelFormat format;
+
+	/** true if the stream provides DmaBufFrame, false for MemoryFrame */
+	bool isDmaBuf;
+};
+
+/** This event is sent when the stream is disconnected.
+ * You must then stop all ongoing processing of frames and release all frames that were
+ * previously given to you by a FrameReceived event, before you finish processing this event. */
+class Disconnected {};
+
+/** This event is sent for every frame in the PipeWire stream, if the stream uses
+ * conventional memory. Remember to keep the unique_ptr to this frame while using its pixel data. */
+class MemoryFrameReceived
+{
+public:
+	/** the frame data including its dimensions, format and a pointer to pixel data */
+	std::unique_ptr<MemoryFrame> frame;
+};
+
+/** This event is sent for every frame in the PipeWire stream, if the stream uses
+ * DmaBuf (GPU) memory. Remember to keep the unique_ptr to this frame while using its file descriptor. */
+class DmaBufFrameReceived
+{
+public:
+	/** the frame data including its dimensions, format and a DRM PRIME file descriptor */
+	std::unique_ptr<DmaBufFrame> frame;
+};
+
+
+using Event = std::variant<Connected, Disconnected, MemoryFrameReceived, DmaBufFrameReceived>;
+
+} // namespace event
+
+
+
 class StreamCallbacks
 {
 public:
-	/** This callback function is called after the PipeWire stream became connected.
-	 * You should use it to set up a consumer that processes the frames given to you by
-	 * the processMemoryFrame/processDmaBufFrame functions.
-	 *
-	 * A stream can either provide the frames in conventional memory or as a reference to GPU memory.
-	 * The @em isDmaBuf parameter tells you what type it is. The appropriate pushFrame function is called
-	 * for each type.
+	/** Process an event from the PipeWireStream, like a "connect" or "frame received" event.
 	 *
 	 * Should the callback throw an exception, the stream is disconnected and the exception forwarded to
 	 * the caller of PipeWireStream::runStreamLoop().
-	 * @param dimensions the width and height of the stream in pixels
-	 * @param format the pixel format of each video frame
-	 * @param isDmaBuf true if the stream provides DmaBufFrame, false for MemoryFrame */
-	virtual void streamConnected(Rect dimensions, PixelFormat format, bool isDmaBuf) = 0;
-
-	/** This callback function is called when the stream is disconnected.
-	 * You should stop all ongoing processing of frames here and release all frames that were
-	 * previously given to you by a pushFrame call. */
-	virtual void streamDisconnected() = 0;
-
-	/** This callback function is called for every frame in the PipeWire stream, if the stream uses
-	 * conventional memory. Remember to keep a reference to this frame while using its pixel data.
-	 * @param frame the frame data including its dimensions, format and a pointer to pixel data */
-	virtual void processMemoryFrame(std::unique_ptr<MemoryFrame> frame) = 0;
-
-	/** This callback function is called for every frame in the PipeWire stream, if the stream uses
-	 * DmaBuf (GPU) memory. Remember to keep a reference to this frame while using its file descriptor.
-	 * @param frame the frame data including its dimensions, format and a DRM PRIME file descriptor */
-	virtual void processDmaBufFrame(std::unique_ptr<DmaBufFrame> frame) = 0;
+	 */
+	virtual void processEvent(event::Event e) = 0;
 
 };
+
+
 
 class PipeWireStream;
 
