@@ -101,7 +101,7 @@ int main(int argc, char** argv)
 
 
 		{
-			class Stream2FFmpeg : public pw::StreamCallbacks
+			class Stream2FFmpeg
 			{
 				std::unique_ptr<ffmpeg::FFmpegOutput> ffmpegOutput;
 				const char* hardwareDevice;
@@ -117,7 +117,7 @@ int main(int argc, char** argv)
 				  outputPath{outputPath}
 				{}
 
-				void processEvent(pw::event::Event e) override
+				void processEvent(pw::event::Event e)
 				{
 					// delegate event to type-matching operator method
 					std::visit(*this, e);

@@ -51,15 +51,9 @@ struct PipeWireStream_Event
 	};
 };
 
-typedef struct
-{
-	void (*processEvent)(const struct PipeWireStream_Event* e);
-
-} StreamCallbacks_t;
-
 struct PipeWireStream;
 
-SCW_EXPORT struct PipeWireStream* PipeWireStream_connect(const SharedScreen_t* shareInfo, const StreamCallbacks_t* cbs);
+SCW_EXPORT struct PipeWireStream* PipeWireStream_connect(const SharedScreen_t* shareInfo);
 
 SCW_EXPORT void PipeWireStream_free(struct PipeWireStream* stream);
 

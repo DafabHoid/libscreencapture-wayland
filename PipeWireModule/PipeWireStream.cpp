@@ -465,17 +465,15 @@ static constexpr inline PixelFormat toCFormat(pw::PixelFormat format)
 	}
 }
 
-class CallbackWrapper : public pw::StreamCallbacks
+class EventToCEventConverter
 {
-	const StreamCallbacks_t* c_callbacks;
+	PipeWireStream_Event* output_c_event;
 
 public:
-	explicit CallbackWrapper(const StreamCallbacks_t* toWrap)
-	: c_callbacks(toWrap)
-	{}
 
-	void processEvent(pw::event::Event e) override
+	void processEvent(pw::event::Event e, PipeWireStream_Event* output_event)
 	{
+		output_c_event = output_event;
 		std::visit(*this, e);
 	}
 
@@ -486,20 +484,14 @@ public:
 				e.dimensions.h
 		};
 		::PixelFormat c_format = toCFormat(e.format);
-		PipeWireStream_Event c_e {
-				.type = PWSTREAM_EVENT_TYPE_CONNECTED,
-				.connect = {c_dimensions, c_format, e.isDmaBuf}
-		};
-		c_callbacks->processEvent(&c_e);
+		output_c_event->type = PWSTREAM_EVENT_TYPE_CONNECTED;
+		output_c_event->connect = {c_dimensions, c_format, e.isDmaBuf};
 	}
 
 	void operator()(pw::event::Disconnected& e)
 	{
-		PipeWireStream_Event c_e {
-				.type = PWSTREAM_EVENT_TYPE_DISCONNECTED,
-				.disconnect = {}
-		};
-		c_callbacks->processEvent(&c_e);
+		output_c_event->type = PWSTREAM_EVENT_TYPE_DISCONNECTED;
+		output_c_event->disconnect = {};
 	}
 
 	static void onMemoryFrameDoneWrapper(void* opaque) noexcept
@@ -529,11 +521,8 @@ public:
 		c_frame->opaque = frame.release();
 		c_frame->onFrameDone = &onMemoryFrameDoneWrapper;
 
-		PipeWireStream_Event c_e {
-			.type = PWSTREAM_EVENT_TYPE_MEMORY_FRAME_RECEIVED,
-			.memoryFrameReceived = {c_frame}
-		};
-		c_callbacks->processEvent(&c_e);
+		output_c_event->type = PWSTREAM_EVENT_TYPE_MEMORY_FRAME_RECEIVED;
+		output_c_event->memoryFrameReceived = {c_frame};
 	}
 
 	void operator()(pw::event::DmaBufFrameReceived& e)
@@ -550,26 +539,18 @@ public:
 		c_frame->opaque = frame.release();
 		c_frame->onFrameDone = &onDmaBufFrameDoneWrapper;
 
-		PipeWireStream_Event c_e {
-				.type = PWSTREAM_EVENT_TYPE_DMA_BUF_RECEIVED,
-				.dmaBufFrameReceived = {c_frame}
-		};
-		c_callbacks->processEvent(&c_e);
+		output_c_event->type = PWSTREAM_EVENT_TYPE_DMA_BUF_RECEIVED;
+		output_c_event->dmaBufFrameReceived = {c_frame};
 	}
 };
 
 struct PipeWireStream
 {
 	std::unique_ptr<pw::PipeWireStream> cppStream;
-	CallbackWrapper wrappedCallbacks;
 };
 
-struct PipeWireStream* PipeWireStream_connect(const SharedScreen_t* c_shareInfo, const StreamCallbacks_t* cbs)
+struct PipeWireStream* PipeWireStream_connect(const SharedScreen_t* c_shareInfo)
 {
-	auto* pws = new PipeWireStream {
-			nullptr,
-			CallbackWrapper(cbs)
-	};
 	try
 	{
 		pw::SharedScreen shareInfo = {
@@ -577,15 +558,15 @@ struct PipeWireStream* PipeWireStream_connect(const SharedScreen_t* c_shareInfo,
 				c_shareInfo->pipeWireFd,
 				c_shareInfo->pipeWireNode
 		};
-		pws->cppStream = std::make_unique<pw::PipeWireStream>(shareInfo, true);
+		return new PipeWireStream {
+			std::make_unique<pw::PipeWireStream>(shareInfo, true)
+		};
 	}
 	catch (const std::exception& e)
 	{
 		fprintf(stderr, "%s\n", e.what());
-		delete pws;
 		return nullptr;
 	}
-	return pws;
 }
 
 void PipeWireStream_free(struct PipeWireStream* stream)
@@ -593,15 +574,14 @@ void PipeWireStream_free(struct PipeWireStream* stream)
 	delete stream;
 }
 
-int PipeWireStream_pollEvent(struct PipeWireStream* stream, struct PipeWireStream_Event* e, int timeout)
+int PipeWireStream_pollEvent(struct PipeWireStream* stream, struct PipeWireStream_Event* c_e, int timeout)
 {
 	try
 	{
 		auto event = stream->cppStream->pollEvent(std::chrono::seconds(timeout));
 		if (event)
 		{
-			stream->wrappedCallbacks.processEvent(std::move(*event));
-			// TODO convert to C event
+			EventToCEventConverter().processEvent(std::move(*event), c_e);
 			return 1;
 		}
 		else

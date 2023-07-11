@@ -76,20 +76,6 @@ using Event = std::variant<Connected, Disconnected, MemoryFrameReceived, DmaBufF
 
 
 
-class StreamCallbacks
-{
-public:
-	/** Process an event from the PipeWireStream, like a "connect" or "frame received" event.
-	 *
-	 * Should the callback throw an exception, the stream is disconnected and the exception forwarded to
-	 * the caller of PipeWireStream::runStreamLoop().
-	 */
-	virtual void processEvent(event::Event e) = 0;
-
-};
-
-
-
 class PipeWireStream;
 
 struct StreamInfo
