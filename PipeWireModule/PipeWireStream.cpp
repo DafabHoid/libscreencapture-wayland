@@ -129,7 +129,7 @@ void processFrame(void* userData) noexcept
 			{
 				pw_stream_queue_buffer(si->stream, b);
 			};
-			si->mainLoopInfo->streamCallbacks.processEvent(event::MemoryFrameReceived{std::move(f)});
+			si->mainLoopInfo->eventQueue.push(event::MemoryFrameReceived{std::move(f)});
 		}
 		else if (d.type == SPA_DATA_DmaBuf)
 		{
@@ -162,7 +162,7 @@ void processFrame(void* userData) noexcept
 				plane.offset = chunk.offset;
 				plane.pitch = chunk.stride;
 			}
-			si->mainLoopInfo->streamCallbacks.processEvent(event::DmaBufFrameReceived{std::move(f)});
+			si->mainLoopInfo->eventQueue.push(event::DmaBufFrameReceived{std::move(f)});
 		}
 	}
 	catch (const std::exception& e)
@@ -182,7 +182,7 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 		auto& raw = si->format.info.raw;
 		try
 		{
-			si->mainLoopInfo->streamCallbacks.processEvent(event::Connected {
+			si->mainLoopInfo->eventQueue.push(event::Connected {
 				Rect {raw.size.width, raw.size.height},
 				spa2pixelFormat(raw.format),
 				si->haveDmaBuf
@@ -196,8 +196,7 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 	}
 	else if (old == PW_STREAM_STATE_STREAMING)
 	{
-		si->mainLoopInfo->streamCallbacks.processEvent(event::Disconnected{});
-		si->mainLoopInfo->quit();
+		si->mainLoopInfo->eventQueue.push(event::Disconnected{});
 	}
 }
 
@@ -352,13 +351,11 @@ static const spa_pod* buildStreamParams(spa_pod_builder& b, bool withDMABuf)
 	return static_cast<const spa_pod*>(spa_pod_builder_pop(&b, &f));
 }
 
-PipeWireStream::PipeWireStream(const SharedScreen& shareInfo,
-                               StreamCallbacks& cbs, bool supportDmaBuf)
+PipeWireStream::PipeWireStream(const SharedScreen& shareInfo, bool supportDmaBuf)
 : mainLoop{pw_main_loop_new(nullptr)},
   ctx{pw_context_new(pw_main_loop_get_loop(mainLoop), nullptr, 0)},
   core{},
-  streamInfo{},
-  streamCallbacks{cbs}
+  streamInfo{}
 {
 #ifndef NDEBUG
 	pw_log_set_level(spa_log_level::SPA_LOG_LEVEL_DEBUG);
@@ -418,22 +415,33 @@ PipeWireStream::~PipeWireStream() noexcept
 	if (mainLoop) pw_main_loop_destroy(mainLoop);
 }
 
-void PipeWireStream::quit() noexcept
-{
-	pw_main_loop_quit(mainLoop);
-}
-
 void PipeWireStream::setError(std::exception_ptr ep) noexcept
 {
 	streamException = std::move(ep);
 }
 
-void PipeWireStream::runStreamLoop()
+std::optional<pw::event::Event> PipeWireStream::pollEvent(std::chrono::seconds timeout)
 {
-	pw_main_loop_run(mainLoop);
-	// if an exception occurred during the main loop, pass it on
+	if (!eventQueue.empty())
+	{
+		auto event = std::move(eventQueue.front());
+		eventQueue.pop();
+		return event;
+	}
+	pw_loop_enter(pw_main_loop_get_loop(mainLoop));
+	pw_loop_iterate(pw_main_loop_get_loop(mainLoop), static_cast<int>(timeout.count()));
+	pw_loop_leave(pw_main_loop_get_loop(mainLoop));
+	// if an exception occurred during the loop iteration, pass it on
 	if (streamException)
 		std::rethrow_exception(std::move(streamException));
+
+	if (!eventQueue.empty())
+	{
+		auto event = std::move(eventQueue.front());
+		eventQueue.pop();
+		return event;
+	}
+	return std::nullopt;
 }
 
 }
@@ -569,7 +577,7 @@ struct PipeWireStream* PipeWireStream_connect(const SharedScreen_t* c_shareInfo,
 				c_shareInfo->pipeWireFd,
 				c_shareInfo->pipeWireNode
 		};
-		pws->cppStream = std::make_unique<pw::PipeWireStream>(shareInfo, pws->wrappedCallbacks, true);
+		pws->cppStream = std::make_unique<pw::PipeWireStream>(shareInfo, true);
 	}
 	catch (const std::exception& e)
 	{
@@ -585,21 +593,25 @@ void PipeWireStream_free(struct PipeWireStream* stream)
 	delete stream;
 }
 
-int PipeWireStream_runStreamLoop(struct PipeWireStream* stream)
+int PipeWireStream_pollEvent(struct PipeWireStream* stream, struct PipeWireStream_Event* e, int timeout)
 {
 	try
 	{
-		stream->cppStream->runStreamLoop();
-		return 0;
+		auto event = stream->cppStream->pollEvent(std::chrono::seconds(timeout));
+		if (event)
+		{
+			stream->wrappedCallbacks.processEvent(std::move(*event));
+			// TODO convert to C event
+			return 1;
+		}
+		else
+		{
+			return 0;
+		}
 	}
 	catch (const std::exception& e)
 	{
 		fprintf(stderr, "%s\n", e.what());
-		return 1;
+		return -1;
 	}
-}
-
-void PipeWireStream_quit(struct PipeWireStream* stream)
-{
-	stream->cppStream->quit();
 }

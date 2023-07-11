@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <thread>
+#include <atomic>
 
 #ifndef NDEBUG
 #include <execinfo.h>
@@ -21,6 +22,8 @@ static void printUsage(const char* argv0)
 	puts("\tWhere <output format> and <output path> can be any string that is recognized by ffmpeg");
 }
 
+static std::atomic_bool shouldStop = false;
+
 static void quitPwStreamOnTerminateSignal(pw::PipeWireStream& pwStream)
 {
 	sigset_t signalsToWaitFor;
@@ -31,7 +34,7 @@ static void quitPwStreamOnTerminateSignal(pw::PipeWireStream& pwStream)
 	sigwait(&signalsToWaitFor, &sig);
 
 	printf("Stopping stream...\n");
-	pwStream.quit();
+	shouldStop = true;
 }
 
 int main(int argc, char** argv)
@@ -161,22 +164,29 @@ int main(int argc, char** argv)
 				}
 			};
 			Stream2FFmpeg stream2FFmpeg(hardwareDevicePath, outputFormat, outputPath);
-			auto pwStream = pw::PipeWireStream(shareInfo.value(), stream2FFmpeg, true);
+			auto pwStream = pw::PipeWireStream(shareInfo.value(), true);
 
 			// start thread to wait for a terminate signal for a graceful shutdown
 			std::thread signalHandlerThread([&pwStream]() { quitPwStreamOnTerminateSignal(pwStream); });
 
+			while (!shouldStop)
 			try
 			{
-				pwStream.runStreamLoop();
-				// raise signal ourselves to unblock the thread if it is still running
-				kill(0, SIGTERM);
-				signalHandlerThread.join();
+				auto ev = pwStream.pollEvent(std::chrono::seconds(-1));
+				if (ev)
+				{
+					if (std::holds_alternative<pw::event::Disconnected>(*ev))
+						shouldStop = true;
+					stream2FFmpeg.processEvent(std::move(*ev));
+				}
 			} catch(...) {
 				kill(0, SIGTERM);
 				signalHandlerThread.join();
 				throw;
 			}
+			// raise signal ourselves to unblock the thread if it is still running
+			kill(0, SIGTERM);
+			signalHandlerThread.join();
 		}
 
 		pw_deinit();

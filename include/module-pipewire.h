@@ -63,9 +63,7 @@ SCW_EXPORT struct PipeWireStream* PipeWireStream_connect(const SharedScreen_t* s
 
 SCW_EXPORT void PipeWireStream_free(struct PipeWireStream* stream);
 
-SCW_EXPORT int PipeWireStream_runStreamLoop(struct PipeWireStream* stream);
-
-SCW_EXPORT void PipeWireStream_quit(struct PipeWireStream* stream);
+SCW_EXPORT int PipeWireStream_pollEvent(struct PipeWireStream* stream, struct PipeWireStream_Event* e, int timeout);
 
 #ifdef __cplusplus
 } // extern "C"

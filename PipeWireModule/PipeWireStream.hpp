@@ -11,6 +11,7 @@
 #include <exception>
 #include <chrono>
 #include <variant>
+#include <queue>
 #include <pipewire/pipewire.h>
 #include <spa/param/video/format.h>
 
@@ -118,34 +119,34 @@ class PipeWireStream
 	pw_core *core;
 	StreamInfo streamInfo;
 	spa_hook coreListener;
+	std::queue<event::Event> eventQueue;
 	std::exception_ptr streamException;
-
-	StreamCallbacks& streamCallbacks;
 
 	friend void streamStateChanged(void*, pw_stream_state, pw_stream_state, const char*) noexcept;
 	friend void processFrame(void*) noexcept;
 
 public:
 	/** Create a new PipeWire stream that is connected to the given shared video stream.
-	 * To actually start streaming and pushing frames to the later stages, you need to call runStreamLoop().
-	 * The given callback interface's methods are called for their respective events. See its documentation for information
-	 * about how they are used. */
-	SCW_EXPORT PipeWireStream(const SharedScreen& shareInfo, StreamCallbacks& streamCallbacks, bool supportDmaBuf);
+	 * To actually start streaming and receiving events like @em FrameReceived, you need to call pollEvent() in a loop. */
+	SCW_EXPORT PipeWireStream(const SharedScreen& shareInfo, bool supportDmaBuf);
 
 	SCW_EXPORT ~PipeWireStream() noexcept;
 
-	/** Run a PipeWire main loop to process all events of this stream.
-	 * This function will block as long as the loop is running. It can be stopped by calling quit().
-	 * @throw std::exception if an exception was set with setError() while the loop ran */
-	SCW_EXPORT void runStreamLoop();
+	/** Poll for an event happening in this stream and return it.
+	 *
+	 * With a non-zero timeout, this function will block until something happens to the PipeWire stream or the timeout
+	 * expires, but this does not guarantee that an event is generated (like when the stream state changes from
+	 * @em unconnected to @em connecting.
+	 * After a pw::event::Disconnected event was returned, this stream is no longer valid and calling this method again
+	 * will result in an error.
+	 * @param timeout Time to block and wait for new events. Zero means do not block, -1 means wait indefinitely
+	 * @throw std::exception In case an unrecoverable error occurs during event processing. The stream can no longer be used afterwards.
+	 * @throw std::exception In case you called this method again after it returned a disconnected event */
+	SCW_EXPORT std::optional<pw::event::Event> pollEvent(std::chrono::seconds timeout);
 
 	/** Store the given exception to pass it to the caller of runStreamLoop(), once the
 	 * stream loop quits. */
 	SCW_EXPORT void setError(std::exception_ptr) noexcept;
-
-	/** Quit the currently running stream loop, so the call to runStreamLoop() returns.
-	 * Can be called from any thread. */
-	SCW_EXPORT void quit() noexcept;
 };
 
 } // namespace pw
