@@ -28,6 +28,12 @@ static void setGlobalStopFlag(int)
 	shouldStop = true;
 }
 
+// boilerplate for std::visit with lambdas
+template<class... Ts>
+struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
 int main(int argc, char** argv)
 {
 	int c;
@@ -91,57 +97,19 @@ int main(int argc, char** argv)
 
 
 		{
-			class Stream2FFmpeg
+			class FPSCounter
 			{
-				std::unique_ptr<ffmpeg::FFmpegOutput> ffmpegOutput;
-				const char* hardwareDevice;
-				const char* outputFormat;
-				const char* outputPath;
 				std::chrono::time_point<std::chrono::steady_clock> lastFpsTS;
 				int frameCountThisSecond;
 
 			public:
-				inline Stream2FFmpeg(const char* hardwareDevice, const char* outputFormat, const char* outputPath)
-				: hardwareDevice{hardwareDevice},
-				  outputFormat{outputFormat},
-				  outputPath{outputPath}
-				{}
-
-				void processEvent(pw::event::Event e)
+				FPSCounter()
 				{
-					// delegate event to type-matching operator method
-					std::visit(*this, e);
-				}
-
-				void operator()(pw::event::Connected& e)
-				{
-					auto builder = ffmpeg::FFmpegOutput::Builder(e.dimensions, e.format, e.isDmaBuf);
-					builder
-						.withScaling(common::Rect {1920u, 1080u})
-						.withHWDevice(hardwareDevice)
-						.withOutputFormat(outputFormat)
-						.withOutputPath(outputPath);
-					ffmpegOutput = std::make_unique<ffmpeg::FFmpegOutput>(builder.build());
 					lastFpsTS = std::chrono::steady_clock::now();
 					frameCountThisSecond = 0;
 				}
-				void operator()(pw::event::Disconnected&)
-				{
-					ffmpegOutput.reset();
-				}
-				void operator()(pw::event::MemoryFrameReceived& e)
-				{
-					auto avFrame = ffmpeg::wrapInAVFrame(std::move(e.frame));
-					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap (avFrame));
-					updateFpsCounter();
-				}
-				void operator()(pw::event::DmaBufFrameReceived& e)
-				{
-					auto avFrame = ffmpeg::wrapInAVFrame(std::move(e.frame));
-					ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap (avFrame));
-					updateFpsCounter();
-				}
-				void updateFpsCounter()
+
+				void increment()
 				{
 					auto now = std::chrono::steady_clock::now();
 					if (now - lastFpsTS >= std::chrono::seconds(1))
@@ -153,17 +121,48 @@ int main(int argc, char** argv)
 					++frameCountThisSecond;
 				}
 			};
-			Stream2FFmpeg stream2FFmpeg(hardwareDevicePath, outputFormat, outputPath);
+
 			auto pwStream = pw::PipeWireStream(shareInfo.value(), true);
+
+			std::unique_ptr<ffmpeg::FFmpegOutput> ffmpegOutput;
+			FPSCounter fpsCounter;
 
 			while (!shouldStop)
 			{
 				auto ev = pwStream.pollEvent(std::chrono::seconds(-1));
 				if (ev)
 				{
-					if (std::holds_alternative<pw::event::Disconnected>(*ev))
-						shouldStop = true;
-					stream2FFmpeg.processEvent(std::move(*ev));
+					// call lambda function appropriate for the type of *ev
+					std::visit(overloaded{
+							[&] (pw::event::Connected& e)
+							{
+								auto builder = ffmpeg::FFmpegOutput::Builder(e.dimensions, e.format, e.isDmaBuf);
+								builder
+										.withScaling(common::Rect{1920u, 1080u})
+										.withHWDevice(hardwareDevicePath)
+										.withOutputFormat(outputFormat)
+										.withOutputPath(outputPath);
+								ffmpegOutput = std::make_unique<ffmpeg::FFmpegOutput>(builder.build());
+								// restart the fps counter
+								fpsCounter = FPSCounter();
+							},
+							[&] (pw::event::Disconnected&)
+							{
+								shouldStop = true;
+							},
+							[&] (pw::event::MemoryFrameReceived& e)
+							{
+								auto avFrame = ffmpeg::wrapInAVFrame(std::move(e.frame));
+								ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(avFrame));
+								fpsCounter.increment();
+							},
+							[&] (pw::event::DmaBufFrameReceived& e)
+							{
+								auto avFrame = ffmpeg::wrapInAVFrame(std::move(e.frame));
+								ffmpegOutput->pushFrame(ffmpeg::AVFrame_Heap(avFrame));
+								fpsCounter.increment();
+							}
+					}, *ev);
 				}
 			}
 		}
