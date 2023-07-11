@@ -403,6 +403,8 @@ PipeWireStream::PipeWireStream(const SharedScreen& shareInfo, bool supportDmaBuf
 
 PipeWireStream::~PipeWireStream() noexcept
 {
+	while(!eventQueue.empty())
+		eventQueue.pop();
 	if (streamInfo.stream)
 	{
 		pw_stream_disconnect(streamInfo.stream);
