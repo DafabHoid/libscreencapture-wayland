@@ -5,7 +5,6 @@
 #include <cstdio>
 #include <unistd.h>
 #include <signal.h>
-#include <thread>
 #include <atomic>
 
 #ifndef NDEBUG
@@ -24,16 +23,8 @@ static void printUsage(const char* argv0)
 
 static std::atomic_bool shouldStop = false;
 
-static void quitPwStreamOnTerminateSignal(pw::PipeWireStream& pwStream)
+static void setGlobalStopFlag(int)
 {
-	sigset_t signalsToWaitFor;
-	sigemptyset(&signalsToWaitFor);
-	sigaddset(&signalsToWaitFor, SIGINT);
-	sigaddset(&signalsToWaitFor, SIGTERM);
-	int sig = 0;
-	sigwait(&signalsToWaitFor, &sig);
-
-	printf("Stopping stream...\n");
 	shouldStop = true;
 }
 
@@ -79,12 +70,11 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	// Block both of these signals, so they don't get delivered except to to a separate thread created later
-	sigset_t procset;
-	sigemptyset(&procset);
-	sigaddset(&procset, SIGINT);
-	sigaddset(&procset, SIGTERM);
-	sigprocmask(SIG_BLOCK, &procset, nullptr);
+	struct sigaction sigIntHandler {};
+	sigemptyset(&sigIntHandler.sa_mask);
+	sigIntHandler.sa_handler = &setGlobalStopFlag;
+	sigaction(SIGINT, &sigIntHandler, nullptr);
+	sigaction(SIGTERM, &sigIntHandler, nullptr);
 
 	try
 	{
@@ -166,11 +156,7 @@ int main(int argc, char** argv)
 			Stream2FFmpeg stream2FFmpeg(hardwareDevicePath, outputFormat, outputPath);
 			auto pwStream = pw::PipeWireStream(shareInfo.value(), true);
 
-			// start thread to wait for a terminate signal for a graceful shutdown
-			std::thread signalHandlerThread([&pwStream]() { quitPwStreamOnTerminateSignal(pwStream); });
-
 			while (!shouldStop)
-			try
 			{
 				auto ev = pwStream.pollEvent(std::chrono::seconds(-1));
 				if (ev)
@@ -179,14 +165,7 @@ int main(int argc, char** argv)
 						shouldStop = true;
 					stream2FFmpeg.processEvent(std::move(*ev));
 				}
-			} catch(...) {
-				kill(0, SIGTERM);
-				signalHandlerThread.join();
-				throw;
 			}
-			// raise signal ourselves to unblock the thread if it is still running
-			kill(0, SIGTERM);
-			signalHandlerThread.join();
 		}
 
 		pw_deinit();
