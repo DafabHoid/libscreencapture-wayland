@@ -9,7 +9,6 @@
 #include <cstdint>
 #include <functional>
 #include <memory> // shared_ptr
-#include <optional>
 #include <chrono>
 
 #define SCW_EXPORT [[gnu::visibility("default")]]

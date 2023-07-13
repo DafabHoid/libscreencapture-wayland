@@ -52,6 +52,27 @@ static constexpr inline PixelFormat spa2pixelFormat(spa_video_format format)
 	}
 }
 
+struct StreamInfo
+{
+	pw_stream *stream;
+	spa_video_info format;
+	bool haveDmaBuf;
+	pw_stream_state state;
+	std::chrono::time_point<std::chrono::steady_clock> startTime;
+	struct
+	{
+		int32_t x;
+		int32_t y;
+	} cursorPos;
+	struct
+	{
+		uint32_t w;
+		uint32_t h;
+		uint8_t *bitmap;
+	} cursorBitmap;
+	PipeWireStream *mainLoopInfo;
+};
+
 void processFrame(void* userData) noexcept
 {
 	auto si = static_cast<pw::StreamInfo*>(userData);
@@ -334,7 +355,7 @@ PipeWireStream::PipeWireStream(const SharedScreen& shareInfo, bool supportDmaBuf
 : mainLoop{pw_main_loop_new(nullptr)},
   ctx{pw_context_new(pw_main_loop_get_loop(mainLoop), nullptr, 0)},
   core{},
-  streamInfo{}
+  streamInfo(new StreamInfo{})
 {
 #ifndef NDEBUG
 	pw_log_set_level(spa_log_level::SPA_LOG_LEVEL_DEBUG);
@@ -348,16 +369,16 @@ PipeWireStream::PipeWireStream(const SharedScreen& shareInfo, bool supportDmaBuf
 	}
 
 	// register callbacks for core info and error events
-	streamInfo.mainLoopInfo = this;
-	pw_core_add_listener(core, &coreListener, &coreEvents, &streamInfo);
+	streamInfo->mainLoopInfo = this;
+	pw_core_add_listener(core, &coreListener, &coreEvents, streamInfo);
 
 	// create a new video stream with our stream event callbacks
 	pw_properties* props = pw_properties_new(PW_KEY_MEDIA_TYPE, "Video",
 											 PW_KEY_MEDIA_CATEGORY, "Capture",
 											 PW_KEY_MEDIA_ROLE, "Screen", nullptr);
-	streamInfo.stream = pw_stream_new_simple(pw_main_loop_get_loop(mainLoop), "GfxTablet ScreenCapture",
-												 props, &streamEvents, &streamInfo);
-	if (!streamInfo.stream)
+	streamInfo->stream = pw_stream_new_simple(pw_main_loop_get_loop(mainLoop), "GfxTablet ScreenCapture",
+												 props, &streamEvents, streamInfo);
+	if (!streamInfo->stream)
 	{
 		throw std::runtime_error("Could not create stream");
 	}
@@ -372,7 +393,7 @@ PipeWireStream::PipeWireStream(const SharedScreen& shareInfo, bool supportDmaBuf
 
 	assert(params[0] && params[1] && params[0]->size + params[1]->size <= sizeof(buffer));
 
-	if (pw_stream_connect(streamInfo.stream, PW_DIRECTION_INPUT, shareInfo.pipeWireNode,
+	if (pw_stream_connect(streamInfo->stream, PW_DIRECTION_INPUT, shareInfo.pipeWireNode,
 	                      static_cast<pw_stream_flags>(PW_STREAM_FLAG_MAP_BUFFERS | PW_STREAM_FLAG_AUTOCONNECT),
 						  params, sizeof(params)/sizeof(params[0])) < 0)
 	{
@@ -384,13 +405,14 @@ PipeWireStream::~PipeWireStream() noexcept
 {
 	while(!eventQueue.empty())
 		eventQueue.pop();
-	if (streamInfo.stream)
+	if (streamInfo->stream)
 	{
-		pw_stream_disconnect(streamInfo.stream);
-		pw_stream_destroy(streamInfo.stream);
+		pw_stream_disconnect(streamInfo->stream);
+		pw_stream_destroy(streamInfo->stream);
 	}
-	if (streamInfo.cursorBitmap.bitmap)
-		delete[] streamInfo.cursorBitmap.bitmap;
+	if (streamInfo->cursorBitmap.bitmap)
+		delete[] streamInfo->cursorBitmap.bitmap;
+	delete streamInfo;
 	if (core) pw_core_disconnect(core);
 	if (ctx) pw_context_destroy(ctx);
 	if (mainLoop) pw_main_loop_destroy(mainLoop);
@@ -398,15 +420,15 @@ PipeWireStream::~PipeWireStream() noexcept
 
 std::optional<pw::event::Event> PipeWireStream::pollEvent(std::chrono::seconds timeout)
 {
-	if (streamInfo.state == PW_STREAM_STATE_UNCONNECTED)
+	if (streamInfo->state == PW_STREAM_STATE_UNCONNECTED)
 	{
 		[[unlikely]]
 		throw std::runtime_error("PipeWireStream::pollEvent called on a disconnected stream");
 	}
-	if (streamInfo.state == PW_STREAM_STATE_ERROR)
+	if (streamInfo->state == PW_STREAM_STATE_ERROR)
 	{
 		const char* error = "Unknown stream error";
-		pw_stream_get_state(streamInfo.stream, &error);
+		pw_stream_get_state(streamInfo->stream, &error);
 		throw std::runtime_error(std::string("PipeWireStream::pollEvent called, but stream is in failed state. Reason: ") + error);
 	}
 	if (!eventQueue.empty())

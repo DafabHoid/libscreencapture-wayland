@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <chrono>
 #include <variant>
+#include <optional>
 #include <queue>
 #include <pipewire/pipewire.h>
 #include <spa/param/video/format.h>
@@ -73,30 +74,7 @@ using Event = std::variant<Connected, Disconnected, MemoryFrameReceived, DmaBufF
 
 } // namespace event
 
-
-
-class PipeWireStream;
-
-struct StreamInfo
-{
-	pw_stream *stream;
-	spa_video_info format;
-	bool haveDmaBuf;
-	pw_stream_state state;
-	std::chrono::time_point<std::chrono::steady_clock> startTime;
-	struct
-	{
-		int32_t x;
-		int32_t y;
-	} cursorPos;
-	struct
-	{
-		uint32_t w;
-		uint32_t h;
-		uint8_t *bitmap;
-	} cursorBitmap;
-	PipeWireStream *mainLoopInfo;
-};
+class StreamInfo;
 
 /** This class encapsulates a receiver of a PipeWire video stream. It connects to the stream, negotiates a suitable
  * frame format and starts receiving frames. Stream events (like when a frame has been received) can be polled for with
@@ -138,7 +116,7 @@ class PipeWireStream
 	pw_main_loop* mainLoop;
 	pw_context* ctx;
 	pw_core* core;
-	StreamInfo streamInfo;
+	StreamInfo* streamInfo;
 	spa_hook coreListener;
 	std::queue<event::Event> eventQueue;
 
