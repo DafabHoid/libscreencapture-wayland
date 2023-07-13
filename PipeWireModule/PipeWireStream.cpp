@@ -160,6 +160,7 @@ void processFrame(void* userData) noexcept
 void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw, const char* msg) noexcept
 {
 	auto si = static_cast<pw::StreamInfo*>(userData);
+	si->state = nw;
 	printf("\x1b[1mStream state changed:\x1b[0m old: %s, new: %s, msg: %s\n", pw_stream_state_as_string(old), pw_stream_state_as_string(nw), msg);
 	if (old == PW_STREAM_STATE_PAUSED && nw == PW_STREAM_STATE_STREAMING)
 	{
@@ -397,6 +398,17 @@ PipeWireStream::~PipeWireStream() noexcept
 
 std::optional<pw::event::Event> PipeWireStream::pollEvent(std::chrono::seconds timeout)
 {
+	if (streamInfo.state == PW_STREAM_STATE_UNCONNECTED)
+	{
+		[[unlikely]]
+		throw std::runtime_error("PipeWireStream::pollEvent called on a disconnected stream");
+	}
+	if (streamInfo.state == PW_STREAM_STATE_ERROR)
+	{
+		const char* error = "Unknown stream error";
+		pw_stream_get_state(streamInfo.stream, &error);
+		throw std::runtime_error(std::string("PipeWireStream::pollEvent called, but stream is in failed state. Reason: ") + error);
+	}
 	if (!eventQueue.empty())
 	{
 		auto event = std::move(eventQueue.front());

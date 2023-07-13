@@ -82,6 +82,7 @@ struct StreamInfo
 	pw_stream *stream;
 	spa_video_info format;
 	bool haveDmaBuf;
+	pw_stream_state state;
 	std::chrono::time_point<std::chrono::steady_clock> startTime;
 	struct
 	{
