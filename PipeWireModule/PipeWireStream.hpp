@@ -8,7 +8,6 @@
 
 #include "../common.hpp"
 #include <cstdint>
-#include <exception>
 #include <chrono>
 #include <variant>
 #include <queue>
@@ -106,7 +105,6 @@ class PipeWireStream
 	StreamInfo streamInfo;
 	spa_hook coreListener;
 	std::queue<event::Event> eventQueue;
-	std::exception_ptr streamException;
 
 	friend void streamStateChanged(void*, pw_stream_state, pw_stream_state, const char*) noexcept;
 	friend void processFrame(void*) noexcept;
@@ -126,13 +124,8 @@ public:
 	 * After a pw::event::Disconnected event was returned, this stream is no longer valid and calling this method again
 	 * will result in an error.
 	 * @param timeout Time to block and wait for new events. Zero means do not block, -1 means wait indefinitely
-	 * @throw std::exception In case an unrecoverable error occurs during event processing. The stream can no longer be used afterwards.
 	 * @throw std::exception In case you called this method again after it returned a disconnected event */
 	SCW_EXPORT std::optional<pw::event::Event> pollEvent(std::chrono::seconds timeout);
-
-	/** Store the given exception to pass it to the caller of runStreamLoop(), once the
-	 * stream loop quits. */
-	SCW_EXPORT void setError(std::exception_ptr) noexcept;
 };
 
 } // namespace pw

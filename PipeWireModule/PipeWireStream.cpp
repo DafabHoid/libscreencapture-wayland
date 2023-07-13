@@ -19,13 +19,6 @@ using namespace std::chrono;
 namespace pw
 {
 
-void quit(pw::StreamInfo* si, std::exception_ptr ep)
-{
-	si->mainLoopInfo->setError(ep);
-	pw_stream_set_active(si->stream, false);
-	pw_stream_flush(si->stream, false);
-}
-
 static uint32_t spa2drmFormat(spa_video_format format)
 {
 	switch (format) {
@@ -106,70 +99,61 @@ void processFrame(void* userData) noexcept
 		pts = now - si->startTime;
 	}
 
-	try
+	spa_data& d = b->buffer->datas[0];
+	if (d.type == SPA_DATA_MemPtr || d.type == SPA_DATA_MemFd)
 	{
-		spa_data& d = b->buffer->datas[0];
-		if (d.type == SPA_DATA_MemPtr || d.type == SPA_DATA_MemFd)
-		{
 #ifndef NDEBUG
-			printf("Memory-mapped buffer info: size = %x, stride = %x, ptr = %p\n",
-			       d.chunk->size, d.chunk->stride, d.data);
+		printf("Memory-mapped buffer info: size = %x, stride = %x, ptr = %p\n",
+		       d.chunk->size, d.chunk->stride, d.data);
 #endif
-			assert(b->buffer->n_datas == 1);
-			auto f = std::make_unique<MemoryFrame>();
-			f->width = si->format.info.raw.size.width;
-			f->height = si->format.info.raw.size.height;
-			f->pts = pts;
-			f->format = spa2pixelFormat(si->format.info.raw.format);
-			f->memory = d.data;
-			f->stride = static_cast<size_t>(d.chunk->stride);
-			f->size = d.chunk->size;
-			f->offset = d.chunk->offset;
-			f->onFrameDone = [si, b]()
-			{
-				pw_stream_queue_buffer(si->stream, b);
-			};
-			si->mainLoopInfo->eventQueue.push(event::MemoryFrameReceived{std::move(f)});
-		}
-		else if (d.type == SPA_DATA_DmaBuf)
+		assert(b->buffer->n_datas == 1);
+		auto f = std::make_unique<MemoryFrame>();
+		f->width = si->format.info.raw.size.width;
+		f->height = si->format.info.raw.size.height;
+		f->pts = pts;
+		f->format = spa2pixelFormat(si->format.info.raw.format);
+		f->memory = d.data;
+		f->stride = static_cast<size_t>(d.chunk->stride);
+		f->size = d.chunk->size;
+		f->offset = d.chunk->offset;
+		f->onFrameDone = [si, b]()
 		{
-			// No DRM format uses more than 4 planes, so ignore higher values (DmaBufFrame only supports 4 planes)
-			unsigned int planeCount = std::min(b->buffer->n_datas, 4u);
+			pw_stream_queue_buffer(si->stream, b);
+		};
+		si->mainLoopInfo->eventQueue.push(event::MemoryFrameReceived{std::move(f)});
+	}
+	else if (d.type == SPA_DATA_DmaBuf)
+	{
+		// No DRM format uses more than 4 planes, so ignore higher values (DmaBufFrame only supports 4 planes)
+		unsigned int planeCount = std::min(b->buffer->n_datas, 4u);
 #ifndef NDEBUG
-			printf("DMA-BUF info: fd = %ld, size = %x, totalSize = %x, stride = %x, planeCount = %u, offset = %x\n",
-			       d.fd, d.chunk->size, d.maxsize, d.chunk->stride, b->buffer->n_datas, d.chunk->offset);
+		printf("DMA-BUF info: fd = %ld, size = %x, totalSize = %x, stride = %x, planeCount = %u, offset = %x\n",
+		       d.fd, d.chunk->size, d.maxsize, d.chunk->stride, b->buffer->n_datas, d.chunk->offset);
 #endif
 
-			auto f = std::make_unique<DmaBufFrame>();
-			f->width = si->format.info.raw.size.width;
-			f->height = si->format.info.raw.size.height;
-			f->pts = pts;
-			f->drmFormat = spa2drmFormat(si->format.info.raw.format);
-			f->drmObject = {
-					.fd = static_cast<int>(b->buffer->datas[0].fd),
-					.totalSize = b->buffer->datas[0].maxsize,
-					.modifier = si->format.info.raw.modifier,
-			};
-			f->planeCount = planeCount;
-			f->onFrameDone = [si, b]()
-			{
-				pw_stream_queue_buffer(si->stream, b);
-			};
-			for (unsigned int l = 0; l < planeCount; ++l)
-			{
-				auto& plane = f->planes[l];
-				spa_chunk& chunk = *b->buffer->datas[l].chunk;
-				plane.offset = chunk.offset;
-				plane.pitch = chunk.stride;
-			}
-			si->mainLoopInfo->eventQueue.push(event::DmaBufFrameReceived{std::move(f)});
+		auto f = std::make_unique<DmaBufFrame>();
+		f->width = si->format.info.raw.size.width;
+		f->height = si->format.info.raw.size.height;
+		f->pts = pts;
+		f->drmFormat = spa2drmFormat(si->format.info.raw.format);
+		f->drmObject = {
+				.fd = static_cast<int>(b->buffer->datas[0].fd),
+				.totalSize = b->buffer->datas[0].maxsize,
+				.modifier = si->format.info.raw.modifier,
+		};
+		f->planeCount = planeCount;
+		f->onFrameDone = [si, b]()
+		{
+			pw_stream_queue_buffer(si->stream, b);
+		};
+		for (unsigned int l = 0; l < planeCount; ++l)
+		{
+			auto& plane = f->planes[l];
+			spa_chunk& chunk = *b->buffer->datas[l].chunk;
+			plane.offset = chunk.offset;
+			plane.pitch = chunk.stride;
 		}
-	}
-	catch (const std::exception& e)
-	{
-		// exceptions must not travel outside this function, because it is called by C code
-		// → catch them here instead
-		quit(si, std::current_exception());
+		si->mainLoopInfo->eventQueue.push(event::DmaBufFrameReceived{std::move(f)});
 	}
 }
 
@@ -180,18 +164,11 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 	if (old == PW_STREAM_STATE_PAUSED && nw == PW_STREAM_STATE_STREAMING)
 	{
 		auto& raw = si->format.info.raw;
-		try
-		{
-			si->mainLoopInfo->eventQueue.push(event::Connected {
-				Rect {raw.size.width, raw.size.height},
-				spa2pixelFormat(raw.format),
-				si->haveDmaBuf
-			});
-		}
-		catch (const std::exception& e)
-		{
-			quit(si, std::current_exception());
-		}
+		si->mainLoopInfo->eventQueue.push(event::Connected {
+			Rect {raw.size.width, raw.size.height},
+			spa2pixelFormat(raw.format),
+			si->haveDmaBuf
+		});
 		si->startTime = steady_clock::now();
 	}
 	else if (old == PW_STREAM_STATE_STREAMING)
@@ -271,8 +248,9 @@ static void coreInfo(void* userData, const pw_core_info* info) noexcept
 static void coreError(void* userData, uint32_t id, int seq, int res, const char* msg) noexcept
 {
 	auto si = static_cast<pw::StreamInfo*>(userData);
-	printf("PipeWire error, id = %u, seq = %d, res = %d (%s): %s\n", id, seq, res, strerror(res), msg);
-	quit(si, std::make_exception_ptr(std::runtime_error("PipeWire error")));
+	fprintf(stderr, "PipeWire error, id = %u, seq = %d, res = %d (%s): %s\n", id, seq, res, strerror(res), msg);
+	pw_stream_set_active(si->stream, false);
+	pw_stream_flush(si->stream, false);
 }
 
 static const pw_core_events coreEvents = {
@@ -417,11 +395,6 @@ PipeWireStream::~PipeWireStream() noexcept
 	if (mainLoop) pw_main_loop_destroy(mainLoop);
 }
 
-void PipeWireStream::setError(std::exception_ptr ep) noexcept
-{
-	streamException = std::move(ep);
-}
-
 std::optional<pw::event::Event> PipeWireStream::pollEvent(std::chrono::seconds timeout)
 {
 	if (!eventQueue.empty())
@@ -433,9 +406,6 @@ std::optional<pw::event::Event> PipeWireStream::pollEvent(std::chrono::seconds t
 	pw_loop_enter(pw_main_loop_get_loop(mainLoop));
 	pw_loop_iterate(pw_main_loop_get_loop(mainLoop), static_cast<int>(timeout.count()));
 	pw_loop_leave(pw_main_loop_get_loop(mainLoop));
-	// if an exception occurred during the loop iteration, pass it on
-	if (streamException)
-		std::rethrow_exception(std::move(streamException));
 
 	if (!eventQueue.empty())
 	{
