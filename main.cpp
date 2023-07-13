@@ -124,6 +124,8 @@ int main(int argc, char** argv)
 
 			auto pwStream = pw::PipeWireStream(shareInfo.value(), true);
 
+			// this must be declared after and therefore destroyed before pwStream, so that frame processing is stopped
+			// and all references to frames from the stream are dropped before pwStream is destroyed.
 			std::unique_ptr<ffmpeg::FFmpegOutput> ffmpegOutput;
 			FPSCounter fpsCounter;
 

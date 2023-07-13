@@ -98,11 +98,46 @@ struct StreamInfo
 	PipeWireStream *mainLoopInfo;
 };
 
+/** This class encapsulates a receiver of a PipeWire video stream. It connects to the stream, negotiates a suitable
+ * frame format and starts receiving frames. Stream events (like when a frame has been received) can be polled for with
+ * the pollEvent() method.
+ *
+ * An example usage of the stream looks like this:
+ * @code
+ * PipeWireStream pwStream(shareInfo, supportDmaBuf);
+ * bool shouldStop = false;
+ * while (!shouldStop)
+ * {
+ *     auto ev = pwStream.pollEvent(std::chrono::seconds(-1));
+ *     if (ev)
+ *     {
+ *         // call lambda function appropriate for the type of *ev
+ *         std::visit(overloaded{
+ *             [&] (pw::event::Connected& e)
+ *             {
+ *                 ...
+ *             },
+ *             [&] (pw::event::Disconnected&)
+ *             {
+ *                 shouldStop = true;
+ *             },
+ *             [&] (pw::event::MemoryFrameReceived& e)
+ *             {
+ *                 ...
+ *             },
+ *             [&] (pw::event::DmaBufFrameReceived& e)
+ *             {
+ *                 // might only reach this when you passed supportDmaBuf=true
+ *             }
+ *         }, *ev);
+ *     }
+ * }
+ * @endcode */
 class PipeWireStream
 {
-	pw_main_loop *mainLoop;
-	pw_context *ctx;
-	pw_core *core;
+	pw_main_loop* mainLoop;
+	pw_context* ctx;
+	pw_core* core;
 	StreamInfo streamInfo;
 	spa_hook coreListener;
 	std::queue<event::Event> eventQueue;
@@ -112,9 +147,18 @@ class PipeWireStream
 
 public:
 	/** Create a new PipeWire stream that is connected to the given shared video stream.
-	 * To actually start streaming and receiving events like @em FrameReceived, you need to call pollEvent() in a loop. */
+	 * To actually start streaming and receiving events like @em FrameReceived, you need to call pollEvent() in a loop.
+	 * Negotiating DmaBuf-shared (zerocopy) frames is enabled when you set supportDmaBuf to true, but the other side
+	 * (the display server) can ignore this request and provide memory-mapped frames.
+	 * When supportDmaBuf is false, DmaBufFrameReceived events are never generated.
+	 * @param shareInfo PipeWire descriptor of the shared stream to connect to
+	 * @param supportDmaBuf Set to true if you want to support DmaBuf frames */
 	SCW_EXPORT PipeWireStream(const SharedScreen& shareInfo, bool supportDmaBuf);
 
+	/** Destroy the stream and all frames associated with it.
+	 *
+	 * If the stream is still running, this will disconnect it.
+	 * Make sure that you don't have any references to frames from this stream left when destroying it.*/
 	SCW_EXPORT ~PipeWireStream() noexcept;
 
 	/** Poll for an event happening in this stream and return it.
