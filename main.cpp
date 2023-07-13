@@ -34,6 +34,31 @@ struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
+class FPSCounter
+{
+	std::chrono::time_point<std::chrono::steady_clock> lastFpsTS;
+	int frameCountThisSecond;
+
+public:
+	FPSCounter()
+	{
+		lastFpsTS = std::chrono::steady_clock::now();
+		frameCountThisSecond = 0;
+	}
+
+	void increment()
+	{
+		auto now = std::chrono::steady_clock::now();
+		if (now - lastFpsTS >= std::chrono::seconds(1))
+		{
+			printf("fps: %d\n", frameCountThisSecond);
+			lastFpsTS = now;
+			frameCountThisSecond = 0;
+		}
+		++frameCountThisSecond;
+	}
+};
+
 int main(int argc, char** argv)
 {
 	int c;
@@ -97,31 +122,6 @@ int main(int argc, char** argv)
 
 
 		{
-			class FPSCounter
-			{
-				std::chrono::time_point<std::chrono::steady_clock> lastFpsTS;
-				int frameCountThisSecond;
-
-			public:
-				FPSCounter()
-				{
-					lastFpsTS = std::chrono::steady_clock::now();
-					frameCountThisSecond = 0;
-				}
-
-				void increment()
-				{
-					auto now = std::chrono::steady_clock::now();
-					if (now - lastFpsTS >= std::chrono::seconds(1))
-					{
-						printf("fps: %d\n", frameCountThisSecond);
-						lastFpsTS = now;
-						frameCountThisSecond = 0;
-					}
-					++frameCountThisSecond;
-				}
-			};
-
 			auto pwStream = pw::PipeWireStream(shareInfo.value(), true);
 
 			// this must be declared after and therefore destroyed before pwStream, so that frame processing is stopped
