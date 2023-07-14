@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <unistd.h>
 #include <signal.h>
-#include <atomic>
+#include <sys/signalfd.h>
 #include <poll.h>
 
 #ifndef NDEBUG
@@ -20,13 +20,6 @@ static void printUsage(const char* argv0)
 	printf("Usage: %s [-c] -f <output format> -o <output path> -d <hardware device path>\n", argv0);
 	puts("\tWhere <hardware device path> is a DRM render node like /dev/dri/renderD128");
 	puts("\tWhere <output format> and <output path> can be any string that is recognized by ffmpeg");
-}
-
-static std::atomic_bool shouldStop = false;
-
-static void setGlobalStopFlag(int)
-{
-	shouldStop = true;
 }
 
 // boilerplate for std::visit with lambdas
@@ -102,11 +95,18 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	struct sigaction sigIntHandler {};
-	sigemptyset(&sigIntHandler.sa_mask);
-	sigIntHandler.sa_handler = &setGlobalStopFlag;
-	sigaction(SIGINT, &sigIntHandler, nullptr);
-	sigaction(SIGTERM, &sigIntHandler, nullptr);
+	sigset_t procMask;
+	sigemptyset(&procMask);
+	sigaddset(&procMask, SIGINT);
+	sigaddset(&procMask, SIGTERM);
+	sigprocmask(SIG_BLOCK, &procMask, nullptr);
+
+	int signalFd = signalfd(-1, &procMask, SFD_CLOEXEC);
+	if (signalFd == -1)
+	{
+		perror("creating signalfd failed");
+		return 1;
+	}
 
 	try
 	{
@@ -130,17 +130,26 @@ int main(int argc, char** argv)
 			std::unique_ptr<ffmpeg::FFmpegOutput> ffmpegOutput;
 			FPSCounter fpsCounter;
 
+			bool shouldStop = false;
 			while (!shouldStop)
 			{
-				struct pollfd fds[1];
+				struct pollfd fds[2];
 				fds[0] = {pwStream.getEventPollFd(), POLLIN, 0};
-				int res = poll(fds, 1, -1);
+				fds[1] = {signalFd, POLLIN, 0};
+				int res = poll(fds, 2, -1);
 				if (res == -1)
 				{
 					if (errno == EAGAIN || errno == EINTR)
 						continue;
 					perror("poll failed");
 					return 1;
+				}
+				if (fds[1].revents & POLLIN)
+				{
+					signalfd_siginfo siginfo;
+					read(signalFd, &siginfo, sizeof(siginfo));
+					if (siginfo.ssi_signo == SIGINT || siginfo.ssi_signo == SIGTERM)
+						shouldStop = true;
 				}
 				if (!(fds[0].revents & POLLIN))
 					continue;
@@ -183,10 +192,12 @@ int main(int argc, char** argv)
 		}
 
 		pw_deinit();
+		close(signalFd);
 		return 0;
 	}
 	catch (const std::exception& e)
 	{
+		close(signalFd);
 		if (isatty(fileno(stderr)))
 			// print exception text in bold red font
 			fprintf(stderr, "\x1b[1;31m%s\x1b[0m\n", e.what());
