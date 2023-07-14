@@ -52,30 +52,11 @@ static constexpr inline PixelFormat spa2pixelFormat(spa_video_format format)
 	}
 }
 
-struct StreamInfo
-{
-	pw_stream *stream;
-	spa_video_info format;
-	bool haveDmaBuf;
-	pw_stream_state state;
-	std::chrono::time_point<std::chrono::steady_clock> startTime;
-	struct
-	{
-		int32_t x;
-		int32_t y;
-	} cursorPos;
-	struct
-	{
-		uint32_t w;
-		uint32_t h;
-		uint8_t *bitmap;
-	} cursorBitmap;
-	PipeWireStream *mainLoopInfo;
-};
 
 void processFrame(void* userData) noexcept
 {
-	auto si = static_cast<pw::StreamInfo*>(userData);
+	auto pwStream = static_cast<pw::PipeWireStream*>(userData);
+	auto si = &pwStream->streamData;
 	if (pw_stream_get_state(si->stream, nullptr) != PW_STREAM_STATE_STREAMING)
 		return;
 
@@ -141,7 +122,7 @@ void processFrame(void* userData) noexcept
 		{
 			pw_stream_queue_buffer(si->stream, b);
 		};
-		si->mainLoopInfo->eventQueue.push(event::MemoryFrameReceived{std::move(f)});
+		pwStream->eventQueue.push(event::MemoryFrameReceived{std::move(f)});
 	}
 	else if (d.type == SPA_DATA_DmaBuf)
 	{
@@ -174,28 +155,28 @@ void processFrame(void* userData) noexcept
 			plane.offset = chunk.offset;
 			plane.pitch = chunk.stride;
 		}
-		si->mainLoopInfo->eventQueue.push(event::DmaBufFrameReceived{std::move(f)});
+		pwStream->eventQueue.push(event::DmaBufFrameReceived{std::move(f)});
 	}
 }
 
 void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw, const char* msg) noexcept
 {
-	auto si = static_cast<pw::StreamInfo*>(userData);
-	si->state = nw;
+	auto pwStream = static_cast<pw::PipeWireStream*>(userData);
+	pwStream->streamData.state = nw;
 	printf("\x1b[1mStream state changed:\x1b[0m old: %s, new: %s, msg: %s\n", pw_stream_state_as_string(old), pw_stream_state_as_string(nw), msg);
 	if (old == PW_STREAM_STATE_PAUSED && nw == PW_STREAM_STATE_STREAMING)
 	{
-		auto& raw = si->format.info.raw;
-		si->mainLoopInfo->eventQueue.push(event::Connected {
+		auto& raw = pwStream->streamData.format.info.raw;
+		pwStream->eventQueue.push(event::Connected {
 			Rect {raw.size.width, raw.size.height},
 			spa2pixelFormat(raw.format),
-			si->haveDmaBuf
+			pwStream->streamData.haveDmaBuf
 		});
-		si->startTime = steady_clock::now();
+		pwStream->streamData.startTime = steady_clock::now();
 	}
 	else if (old == PW_STREAM_STATE_STREAMING)
 	{
-		si->mainLoopInfo->eventQueue.push(event::Disconnected{});
+		pwStream->eventQueue.push(event::Disconnected{});
 	}
 }
 
@@ -203,11 +184,12 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 	(sizeof(struct spa_meta_cursor) + sizeof(struct spa_meta_bitmap) + \
 	 width * height * 4)
 
-static void streamParamChanged(void* userdata, uint32_t paramID, const spa_pod* param) noexcept
+void streamParamChanged(void* userdata, uint32_t paramID, const spa_pod* param) noexcept
 {
 	if (!param || paramID != SPA_PARAM_Format)
 		return;
-	auto si = static_cast<pw::StreamInfo*>(userdata);
+	auto pwStream = static_cast<pw::PipeWireStream*>(userdata);
+	auto si = &pwStream->streamData;
 	if (spa_format_parse(param, &si->format.media_type, &si->format.media_subtype) < 0)
 		return;
 	if (spa_format_video_raw_parse(param, &si->format.info.raw) < 0)
@@ -267,12 +249,12 @@ static void coreInfo(void* userData, const pw_core_info* info) noexcept
 	printf("PipeWire Info: version %s, connection name: %s, user %s on %s\n", info->version, info->name, info->user_name, info->host_name);
 }
 
-static void coreError(void* userData, uint32_t id, int seq, int res, const char* msg) noexcept
+void coreError(void* userData, uint32_t id, int seq, int res, const char* msg) noexcept
 {
-	auto si = static_cast<pw::StreamInfo*>(userData);
+	auto pwStream = static_cast<pw::PipeWireStream*>(userData);
 	fprintf(stderr, "PipeWire error, id = %u, seq = %d, res = %d (%s): %s\n", id, seq, res, strerror(res), msg);
-	pw_stream_set_active(si->stream, false);
-	pw_stream_flush(si->stream, false);
+	pw_stream_set_active(pwStream->streamData.stream, false);
+	pw_stream_flush(pwStream->streamData.stream, false);
 }
 
 static const pw_core_events coreEvents = {
@@ -355,7 +337,7 @@ PipeWireStream::PipeWireStream(const SharedScreen& shareInfo, bool supportDmaBuf
 : mainLoop{pw_main_loop_new(nullptr)},
   ctx{pw_context_new(pw_main_loop_get_loop(mainLoop), nullptr, 0)},
   core{},
-  streamInfo(new StreamInfo{})
+  streamData{}
 {
 #ifndef NDEBUG
 	pw_log_set_level(spa_log_level::SPA_LOG_LEVEL_DEBUG);
@@ -369,16 +351,15 @@ PipeWireStream::PipeWireStream(const SharedScreen& shareInfo, bool supportDmaBuf
 	}
 
 	// register callbacks for core info and error events
-	streamInfo->mainLoopInfo = this;
-	pw_core_add_listener(core, &coreListener, &coreEvents, streamInfo);
+	pw_core_add_listener(core, &coreListener, &coreEvents, this);
 
 	// create a new video stream with our stream event callbacks
 	pw_properties* props = pw_properties_new(PW_KEY_MEDIA_TYPE, "Video",
 											 PW_KEY_MEDIA_CATEGORY, "Capture",
 											 PW_KEY_MEDIA_ROLE, "Screen", nullptr);
-	streamInfo->stream = pw_stream_new_simple(pw_main_loop_get_loop(mainLoop), "GfxTablet ScreenCapture",
-												 props, &streamEvents, streamInfo);
-	if (!streamInfo->stream)
+	streamData.stream = pw_stream_new_simple(pw_main_loop_get_loop(mainLoop), "GfxTablet ScreenCapture",
+	                                         props, &streamEvents, this);
+	if (!streamData.stream)
 	{
 		throw std::runtime_error("Could not create stream");
 	}
@@ -393,9 +374,9 @@ PipeWireStream::PipeWireStream(const SharedScreen& shareInfo, bool supportDmaBuf
 
 	assert(params[0] && params[1] && params[0]->size + params[1]->size <= sizeof(buffer));
 
-	if (pw_stream_connect(streamInfo->stream, PW_DIRECTION_INPUT, shareInfo.pipeWireNode,
+	if (pw_stream_connect(streamData.stream, PW_DIRECTION_INPUT, shareInfo.pipeWireNode,
 	                      static_cast<pw_stream_flags>(PW_STREAM_FLAG_MAP_BUFFERS | PW_STREAM_FLAG_AUTOCONNECT),
-						  params, sizeof(params)/sizeof(params[0])) < 0)
+	                      params, sizeof(params)/sizeof(params[0])) < 0)
 	{
 		throw std::runtime_error("Stream connect failed");
 	}
@@ -405,14 +386,13 @@ PipeWireStream::~PipeWireStream() noexcept
 {
 	while(!eventQueue.empty())
 		eventQueue.pop();
-	if (streamInfo->stream)
+	if (streamData.stream)
 	{
-		pw_stream_disconnect(streamInfo->stream);
-		pw_stream_destroy(streamInfo->stream);
+		pw_stream_disconnect(streamData.stream);
+		pw_stream_destroy(streamData.stream);
 	}
-	if (streamInfo->cursorBitmap.bitmap)
-		delete[] streamInfo->cursorBitmap.bitmap;
-	delete streamInfo;
+	if (streamData.cursorBitmap.bitmap)
+		delete[] streamData.cursorBitmap.bitmap;
 	if (core) pw_core_disconnect(core);
 	if (ctx) pw_context_destroy(ctx);
 	if (mainLoop) pw_main_loop_destroy(mainLoop);
@@ -420,15 +400,15 @@ PipeWireStream::~PipeWireStream() noexcept
 
 std::optional<pw::event::Event> PipeWireStream::pollEvent(std::chrono::seconds timeout)
 {
-	if (streamInfo->state == PW_STREAM_STATE_UNCONNECTED)
+	if (streamData.state == PW_STREAM_STATE_UNCONNECTED)
 	{
 		[[unlikely]]
 		throw std::runtime_error("PipeWireStream::pollEvent called on a disconnected stream");
 	}
-	if (streamInfo->state == PW_STREAM_STATE_ERROR)
+	if (streamData.state == PW_STREAM_STATE_ERROR)
 	{
 		const char* error = "Unknown stream error";
-		pw_stream_get_state(streamInfo->stream, &error);
+		pw_stream_get_state(streamData.stream, &error);
 		throw std::runtime_error(std::string("PipeWireStream::pollEvent called, but stream is in failed state. Reason: ") + error);
 	}
 	if (!eventQueue.empty())

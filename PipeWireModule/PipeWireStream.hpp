@@ -74,7 +74,6 @@ using Event = std::variant<Connected, Disconnected, MemoryFrameReceived, DmaBufF
 
 } // namespace event
 
-class StreamInfo;
 
 /** This class encapsulates a receiver of a PipeWire video stream. It connects to the stream, negotiates a suitable
  * frame format and starts receiving frames. Stream events (like when a frame has been received) can be polled for with
@@ -113,15 +112,37 @@ class StreamInfo;
  * @endcode */
 class PipeWireStream
 {
+	struct StreamInfo
+	{
+		pw_stream* stream;
+		spa_video_info format;
+		bool haveDmaBuf;
+		pw_stream_state state;
+		std::chrono::time_point<std::chrono::steady_clock> startTime;
+		struct
+		{
+			int32_t x;
+			int32_t y;
+		} cursorPos;
+		struct
+		{
+			uint32_t w;
+			uint32_t h;
+			uint8_t* bitmap;
+		} cursorBitmap;
+	};
+
 	pw_main_loop* mainLoop;
 	pw_context* ctx;
 	pw_core* core;
-	StreamInfo* streamInfo;
+	StreamInfo streamData;
 	spa_hook coreListener;
 	std::queue<event::Event> eventQueue;
 
 	friend void streamStateChanged(void*, pw_stream_state, pw_stream_state, const char*) noexcept;
 	friend void processFrame(void*) noexcept;
+	friend void streamParamChanged(void*, uint32_t, const spa_pod*) noexcept;
+	friend void coreError(void*, uint32_t, int, int, const char*) noexcept;
 
 public:
 	/** Create a new PipeWire stream that is connected to the given shared video stream.
