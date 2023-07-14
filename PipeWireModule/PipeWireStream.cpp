@@ -10,9 +10,12 @@
 #include <cstdio>
 #include <cstring>
 #include <cassert>
+#include <cerrno>
 #include <stdexcept> // runtime_error
 #include <algorithm> // max
 #include <libdrm/drm_fourcc.h>
+#include <sys/eventfd.h>
+#include <unistd.h> // read, write
 
 using namespace std::chrono;
 
@@ -122,7 +125,7 @@ void processFrame(void* userData) noexcept
 		{
 			pw_stream_queue_buffer(si->stream, b);
 		};
-		pwStream->eventQueue.push(event::MemoryFrameReceived{std::move(f)});
+		pwStream->enqueueEvent(event::MemoryFrameReceived{std::move(f)});
 	}
 	else if (d.type == SPA_DATA_DmaBuf)
 	{
@@ -155,7 +158,7 @@ void processFrame(void* userData) noexcept
 			plane.offset = chunk.offset;
 			plane.pitch = chunk.stride;
 		}
-		pwStream->eventQueue.push(event::DmaBufFrameReceived{std::move(f)});
+		pwStream->enqueueEvent(event::DmaBufFrameReceived{std::move(f)});
 	}
 }
 
@@ -167,7 +170,7 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 	if (old == PW_STREAM_STATE_PAUSED && nw == PW_STREAM_STATE_STREAMING)
 	{
 		auto& raw = pwStream->streamData.format.info.raw;
-		pwStream->eventQueue.push(event::Connected {
+		pwStream->enqueueEvent(event::Connected {
 			Rect {raw.size.width, raw.size.height},
 			spa2pixelFormat(raw.format),
 			pwStream->streamData.haveDmaBuf
@@ -176,7 +179,7 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 	}
 	else if (old == PW_STREAM_STATE_STREAMING)
 	{
-		pwStream->eventQueue.push(event::Disconnected{});
+		pwStream->enqueueEvent(event::Disconnected{});
 	}
 }
 
@@ -337,11 +340,18 @@ PipeWireStream::PipeWireStream(const SharedScreen& shareInfo, bool supportDmaBuf
 : mainLoop{pw_main_loop_new(nullptr)},
   ctx{pw_context_new(pw_main_loop_get_loop(mainLoop), nullptr, 0)},
   core{},
-  streamData{}
+  streamData{},
+  eventFd{-1}
 {
 #ifndef NDEBUG
 	pw_log_set_level(spa_log_level::SPA_LOG_LEVEL_DEBUG);
 #endif
+
+	eventFd = eventfd(0, EFD_CLOEXEC);
+	if (eventFd == -1)
+	{
+		throw std::runtime_error(std::string("eventfd creation failed") + strerror(errno));
+	}
 
 	// first connect to the PipeWire instance given by the shared file descriptor
 	core = pw_context_connect_fd(ctx, shareInfo.pipeWireFd, nullptr, 0);
@@ -380,10 +390,33 @@ PipeWireStream::PipeWireStream(const SharedScreen& shareInfo, bool supportDmaBuf
 	{
 		throw std::runtime_error("Stream connect failed");
 	}
+
+	mainLoopThread = std::thread([mainLoop = this->mainLoop]() {
+		pw_main_loop_run(mainLoop);
+	});
 }
 
 PipeWireStream::~PipeWireStream() noexcept
 {
+	if (mainLoop)
+	{
+		if (streamData.stream)
+		{
+			// invoke function inside main loop to disable the stream, so no more events are generated
+			auto f = [](spa_loop*, bool, uint32_t, const void*, size_t, void* userData)
+			{
+				auto stream = static_cast<pw_stream*>(userData);
+				return pw_stream_set_active(stream, false);
+			};
+			pw_loop_invoke(pw_main_loop_get_loop(mainLoop), f, 0, nullptr, 0, false, streamData.stream);
+		}
+		// quit main loop so the mainLoopThread can terminate
+		pw_main_loop_quit(mainLoop);
+	}
+	// wait for main loop termination to make sure *this is not used concurrently afterward
+	if (mainLoopThread.joinable())
+		mainLoopThread.join();
+	// clear the event queue before destroying the stream or anything else, as the events might still reference it
 	while(!eventQueue.empty())
 		eventQueue.pop();
 	if (streamData.stream)
@@ -391,6 +424,8 @@ PipeWireStream::~PipeWireStream() noexcept
 		pw_stream_disconnect(streamData.stream);
 		pw_stream_destroy(streamData.stream);
 	}
+	if (eventFd != -1)
+		close(eventFd);
 	if (streamData.cursorBitmap.bitmap)
 		delete[] streamData.cursorBitmap.bitmap;
 	if (core) pw_core_disconnect(core);
@@ -398,7 +433,7 @@ PipeWireStream::~PipeWireStream() noexcept
 	if (mainLoop) pw_main_loop_destroy(mainLoop);
 }
 
-std::optional<pw::event::Event> PipeWireStream::pollEvent(std::chrono::seconds timeout)
+std::optional<pw::event::Event> PipeWireStream::nextEvent()
 {
 	if (streamData.state == PW_STREAM_STATE_UNCONNECTED)
 	{
@@ -411,23 +446,33 @@ std::optional<pw::event::Event> PipeWireStream::pollEvent(std::chrono::seconds t
 		pw_stream_get_state(streamData.stream, &error);
 		throw std::runtime_error(std::string("PipeWireStream::pollEvent called, but stream is in failed state. Reason: ") + error);
 	}
+	std::lock_guard lock(eventQueueMutex);
 	if (!eventQueue.empty())
 	{
 		auto event = std::move(eventQueue.front());
 		eventQueue.pop();
-		return event;
-	}
-	pw_loop_enter(pw_main_loop_get_loop(mainLoop));
-	pw_loop_iterate(pw_main_loop_get_loop(mainLoop), static_cast<int>(timeout.count()));
-	pw_loop_leave(pw_main_loop_get_loop(mainLoop));
-
-	if (!eventQueue.empty())
-	{
-		auto event = std::move(eventQueue.front());
-		eventQueue.pop();
+		if (eventQueue.empty())
+		{
+			// clear eventfd status
+			char buf[8];
+			read(eventFd, buf, sizeof(buf));
+		}
 		return event;
 	}
 	return std::nullopt;
+}
+
+void PipeWireStream::enqueueEvent(pw::event::Event e) noexcept
+{
+	std::lock_guard lock(eventQueueMutex);
+	eventQueue.push(std::move(e));
+	uint64_t num = 1;
+	write(eventFd, &num, sizeof(num));
+}
+
+int PipeWireStream::getEventPollFd() noexcept
+{
+	return eventFd;
 }
 
 }
@@ -560,11 +605,16 @@ void PipeWireStream_free(struct PipeWireStream* stream)
 	delete stream;
 }
 
-int PipeWireStream_pollEvent(struct PipeWireStream* stream, struct PipeWireStream_Event* c_e, int timeout)
+int PipeWireStream_getEventPollFd(struct PipeWireStream* stream)
+{
+	return stream->cppStream->getEventPollFd();
+}
+
+int PipeWireStream_nextEvent(struct PipeWireStream* stream, struct PipeWireStream_Event* c_e)
 {
 	try
 	{
-		auto event = stream->cppStream->pollEvent(std::chrono::seconds(timeout));
+		auto event = stream->cppStream->nextEvent();
 		if (event)
 		{
 			EventToCEventConverter().processEvent(std::move(*event), c_e);

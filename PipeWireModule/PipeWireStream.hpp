@@ -12,6 +12,8 @@
 #include <variant>
 #include <optional>
 #include <queue>
+#include <thread>
+#include <mutex>
 #include <pipewire/pipewire.h>
 #include <spa/param/video/format.h>
 
@@ -77,7 +79,7 @@ using Event = std::variant<Connected, Disconnected, MemoryFrameReceived, DmaBufF
 
 /** This class encapsulates a receiver of a PipeWire video stream. It connects to the stream, negotiates a suitable
  * frame format and starts receiving frames. Stream events (like when a frame has been received) can be polled for with
- * the pollEvent() method.
+ * the file descriptor from getEventPollFd() and then retrieved by nextEvent().
  *
  * An example usage of the stream looks like this:
  * @code
@@ -85,7 +87,13 @@ using Event = std::variant<Connected, Disconnected, MemoryFrameReceived, DmaBufF
  * bool shouldStop = false;
  * while (!shouldStop)
  * {
- *     auto ev = pwStream.pollEvent(std::chrono::seconds(-1));
+ *     struct pollfd pfd = {pwStream.getEventPollFd(), POLLIN, 0};
+ *     int res = poll(&pfd, 1, -1);
+ *     if (res == -1) {...}
+ *     if (!(fds[0].revents & POLLIN))
+ *         continue;
+ *
+ *     auto ev = pwStream.nextEvent();
  *     if (ev)
  *     {
  *         // call lambda function appropriate for the type of *ev
@@ -137,13 +145,17 @@ class PipeWireStream
 	pw_core* core;
 	StreamInfo streamData;
 	spa_hook coreListener;
+	int eventFd;
 	std::queue<event::Event> eventQueue;
+	std::thread mainLoopThread;
+	std::mutex eventQueueMutex;
 
 	friend void streamStateChanged(void*, pw_stream_state, pw_stream_state, const char*) noexcept;
 	friend void processFrame(void*) noexcept;
 	friend void streamParamChanged(void*, uint32_t, const spa_pod*) noexcept;
 	friend void coreError(void*, uint32_t, int, int, const char*) noexcept;
 
+	void enqueueEvent(pw::event::Event e) noexcept;
 public:
 	/** Create a new PipeWire stream that is connected to the given shared video stream.
 	 * To actually start streaming and receiving events like @em FrameReceived, you need to call pollEvent() in a loop.
@@ -160,16 +172,19 @@ public:
 	 * Make sure that you don't have any references to frames from this stream left when destroying it.*/
 	SCW_EXPORT ~PipeWireStream() noexcept;
 
-	/** Poll for an event happening in this stream and return it.
-	 *
-	 * With a non-zero timeout, this function will block until something happens to the PipeWire stream or the timeout
-	 * expires, but this does not guarantee that an event is generated (like when the stream state changes from
-	 * @em unconnected to @em connecting.
-	 * After a pw::event::Disconnected event was returned, this stream is no longer valid and calling this method again
-	 * will result in an error.
-	 * @param timeout Time to block and wait for new events. Zero means do not block, -1 means wait indefinitely
+	/** Get a file descriptor that can be polled for reading. If it becomes readable, a stream event has happened and
+	 * can be retrieved with nextEvent().
+	 * After the stream became disconnected, i.e. after the pw::event::Disconnected was returned from nextEvent(), this
+	 * file descriptor becomes invalid and should no longer be used.
+	 * This method is thread-safe. */
+	SCW_EXPORT int getEventPollFd() noexcept;
+
+	/** Return the next event that happened for this stream.
+	 * You can wait for an event to happen by calling poll() on the file descriptor returned from getEventPollFd().
+	 * If no event happened, returns nothing.
+	 * This method is thread-safe.
 	 * @throw std::exception In case you called this method again after it returned a disconnected event */
-	SCW_EXPORT std::optional<pw::event::Event> pollEvent(std::chrono::seconds timeout);
+	SCW_EXPORT std::optional<pw::event::Event> nextEvent();
 };
 
 } // namespace pw

@@ -118,7 +118,7 @@ if (ENABLE_PIPEWIRE_MODULE)
             PipeWireModule/PipeWireStream.hpp
             include/module-pipewire.h)
     target_include_directories(screencapture-module-pipewire PUBLIC include/)
-    target_link_libraries(screencapture-module-pipewire PUBLIC PkgConfig::pipewire)
+    target_link_libraries(screencapture-module-pipewire PUBLIC PkgConfig::pipewire Threads::Threads)
     set_property(TARGET screencapture-module-pipewire PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
 
     target_link_libraries(screencapture-wayland PUBLIC screencapture-module-pipewire)

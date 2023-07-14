@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <atomic>
+#include <poll.h>
 
 #ifndef NDEBUG
 #include <execinfo.h>
@@ -131,7 +132,19 @@ int main(int argc, char** argv)
 
 			while (!shouldStop)
 			{
-				auto ev = pwStream.pollEvent(std::chrono::seconds(-1));
+				struct pollfd fds[1];
+				fds[0] = {pwStream.getEventPollFd(), POLLIN, 0};
+				int res = poll(fds, 1, -1);
+				if (res == -1)
+				{
+					if (errno == EAGAIN || errno == EINTR)
+						continue;
+					perror("poll failed");
+					return 1;
+				}
+				if (!(fds[0].revents & POLLIN))
+					continue;
+				auto ev = pwStream.nextEvent();
 				if (ev)
 				{
 					// call lambda function appropriate for the type of *ev
