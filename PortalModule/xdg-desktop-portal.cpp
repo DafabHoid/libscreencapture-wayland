@@ -157,8 +157,10 @@ std::pair<int,uint32_t> getPipeWireShareInfo(sdbus::IConnection& connection, Cur
 	{
 		cursorModes = portal->getProperty("AvailableCursorModes").onInterface(SCREENCAST_INTERFACE);
 	}
+#ifndef NDEBUG
 	std::printf("ScreenCast interface, version %u. cursorModes = %#x screenCastSources = %#x\n",
 	             interfaceVersion, cursorModes, screenCastSources);
+#endif
 
 	// generate session name with random characters
 	auto charGenerator = std::uniform_int_distribution<unsigned char>('a', 'z');
@@ -179,7 +181,9 @@ std::pair<int,uint32_t> getPipeWireShareInfo(sdbus::IConnection& connection, Cur
 		throw DBusException("Portal::CreateSession did not return a session handle!");
 	}
 	auto sessionHandle = static_cast<sdbus::ObjectPath>(sessionHandleIt->second.get<std::string>());
+#ifndef NDEBUG
 	std::printf("Session handle acquired: %s\n", sessionHandle.c_str());
+#endif
 
 
 	// select the source type and cursor mode
@@ -208,7 +212,9 @@ std::pair<int,uint32_t> getPipeWireShareInfo(sdbus::IConnection& connection, Cur
 	response = portalRequest(*portal, "Start", {}, {sessionHandle, /* parent_window */ std::string()});
 	if (!response)
 	{
+#ifndef NDEBUG
 		std::fprintf(stderr, "User cancelled screen sharing\n");
+#endif
 		return {-1, {}};
 	}
 	auto streamIt = response.value().find("streams");
