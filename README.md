@@ -114,3 +114,19 @@ For the GStreamer module:
 - `gstreamer-app` – To feed the video stream into GStreamer
 - `gstreamer-video` – For video formats
 - `gstreamer-vaapi` – For hardware accelerated video encoding
+
+### Steps
+Building is done like a typical CMake project:
+
+    $ mkdir build && cd build
+    $ cmake -DCMAKE_BUILD_TYPE=Release ..
+    $ cmake --build . --parallel
+
+Some options you can pass vida `-D<option>=<value>` to cmake:
+   - `ENABLE_PORTAL_MODULE` Set to OFF to disable the portal module build (default ON)
+   - `ENABLE_PIPEWIRE_MODULE` Set to OFF to disable the pipewire module build (default ON)
+   - `ENABLE_FFMPEG_MODULE` Set to OFF to disable the ffmpeg module build (default ON)
+   - `ENABLE_GSTREAMER_MODULE` Set to ON to enable the gstreamer module build (default OFF)
+   - `BUILD_SHARED_LIBS` Set to ON to build a shared library (default OFF)
+   - `BUILD_FFMPEG` Set to ON to build a local minimal ffmpeg distribution for the ffmpeg module.
+Otherwise the system-provided ones are used. (default OFF)
