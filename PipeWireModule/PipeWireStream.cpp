@@ -112,6 +112,7 @@ void processFrame(void* userData) noexcept
 		       d.chunk->size, d.chunk->stride, d.data);
 #endif
 		assert(b->buffer->n_datas == 1);
+		assert(d.data != nullptr);
 		auto f = std::make_unique<MemoryFrame>();
 		f->width = si->format.info.raw.size.width;
 		f->height = si->format.info.raw.size.height;
@@ -177,7 +178,7 @@ void streamStateChanged(void* userData, pw_stream_state old, pw_stream_state nw,
 		});
 		pwStream->streamData.startTime = steady_clock::now();
 	}
-	else if (old == PW_STREAM_STATE_STREAMING)
+	else if (old == PW_STREAM_STATE_STREAMING || nw == PW_STREAM_STATE_ERROR)
 	{
 		pwStream->enqueueEvent(event::Disconnected{});
 	}
@@ -211,7 +212,7 @@ void streamParamChanged(void* userdata, uint32_t paramID, const spa_pod* param) 
 
 	char buffer[0x100];
 	spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
-	uint32_t bufferTypes = (1 << SPA_DATA_MemPtr);
+	uint32_t bufferTypes = (1 << SPA_DATA_MemPtr) | (1 << SPA_DATA_MemFd);
 	if (modifier)
 		bufferTypes |= (1 << SPA_DATA_DmaBuf);
 	const spa_pod* params[3];
