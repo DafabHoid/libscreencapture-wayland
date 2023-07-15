@@ -13,28 +13,32 @@
 #include <cerrno>
 #include <stdexcept> // runtime_error
 #include <algorithm> // max
+#include <string>
 #include <libdrm/drm_fourcc.h>
 #include <sys/eventfd.h>
 #include <unistd.h> // read, write
 
 using namespace std::chrono;
+using namespace std::string_literals;
 
 namespace pw
 {
 
-static uint32_t spa2drmFormat(spa_video_format format)
+static constexpr inline uint32_t spa2drmFormat(spa_video_format format)
 {
-	switch (format) {
-	case SPA_VIDEO_FORMAT_BGRA:
-		return DRM_FORMAT_ARGB8888;
-	case SPA_VIDEO_FORMAT_BGRx:
-		return DRM_FORMAT_XRGB8888;
-	case SPA_VIDEO_FORMAT_RGBA:
-		return DRM_FORMAT_ABGR8888;
-	case SPA_VIDEO_FORMAT_RGBx:
-		return DRM_FORMAT_XBGR8888;
-	default:
-		throw std::runtime_error("invalid format");
+	switch (format)
+	{
+		case SPA_VIDEO_FORMAT_BGRA:
+			return DRM_FORMAT_ARGB8888;
+		case SPA_VIDEO_FORMAT_BGRx:
+			return DRM_FORMAT_XRGB8888;
+		case SPA_VIDEO_FORMAT_RGBA:
+			return DRM_FORMAT_ABGR8888;
+		case SPA_VIDEO_FORMAT_RGBx:
+			return DRM_FORMAT_XBGR8888;
+		default:
+			throw std::runtime_error("could not convert SPA format to DRM format: Unknown format "s
+			                         + spa_debug_type_find_name(spa_type_video_format, format));
 	}
 }
 
@@ -51,7 +55,8 @@ static constexpr inline PixelFormat spa2pixelFormat(spa_video_format format)
 		case SPA_VIDEO_FORMAT_BGRx:
 			return PixelFormat::BGRX;
 		default:
-			throw std::runtime_error("unsupported spa video format");
+			throw std::runtime_error("could not convert SPA format to PixelFormat: Unknown format "s
+			                         + spa_debug_type_find_name(spa_type_video_format, format));
 	}
 }
 
@@ -349,7 +354,7 @@ PipeWireStream::PipeWireStream(const SharedScreen& shareInfo, bool supportDmaBuf
 	eventFd = eventfd(0, EFD_CLOEXEC);
 	if (eventFd == -1)
 	{
-		throw std::runtime_error(std::string("eventfd creation failed") + strerror(errno));
+		throw std::runtime_error("eventfd creation failed"s + strerror(errno));
 	}
 
 	// first connect to the PipeWire instance given by the shared file descriptor
@@ -443,7 +448,7 @@ std::optional<pw::event::Event> PipeWireStream::nextEvent()
 	{
 		const char* error = "Unknown stream error";
 		pw_stream_get_state(streamData.stream, &error);
-		throw std::runtime_error(std::string("PipeWireStream::pollEvent called, but stream is in failed state. Reason: ") + error);
+		throw std::runtime_error("PipeWireStream::pollEvent called, but stream is in failed state. Reason: "s + error);
 	}
 	std::lock_guard lock(eventQueueMutex);
 	if (!eventQueue.empty())
