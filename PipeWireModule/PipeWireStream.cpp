@@ -8,7 +8,7 @@
 #include <spa/pod/pod.h>
 #include <spa/debug/format.h>
 #include <cstdio>
-#include <cstring>
+#include <cstring> // memcpy
 #include <cassert>
 #include <cerrno>
 #include <stdexcept> // runtime_error
@@ -86,8 +86,10 @@ void processFrame(void* userData) noexcept
 				delete[] si->cursorBitmap.bitmap;
 			si->cursorBitmap.bitmap = new uint8_t[size];
 			std::memcpy(si->cursorBitmap.bitmap, bitmap, size);
+#ifndef NDEBUG
 			printf("Cursor: (%d,%d) [%d,%d] %s\n", si->cursorPos.x, si->cursorPos.y,
 					si->cursorBitmap.w, si->cursorBitmap.h, spa_debug_type_find_name(spa_type_video_format, mb->format));
+#endif
 		}
 	}
 
@@ -344,10 +346,6 @@ PipeWireStream::PipeWireStream(const SharedScreen& shareInfo, bool supportDmaBuf
   streamData{},
   eventFd{-1}
 {
-#ifndef NDEBUG
-	pw_log_set_level(spa_log_level::SPA_LOG_LEVEL_DEBUG);
-#endif
-
 	eventFd = eventfd(0, EFD_CLOEXEC);
 	if (eventFd == -1)
 	{
