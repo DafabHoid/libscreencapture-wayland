@@ -1,3 +1,8 @@
+/*******************************************************************************
+   Copyright © 2022-2023 by DafabHoid <github@dafaboid.de>
+
+   SPDX-License-Identifier: GPL-3.0-or-later
+*******************************************************************************/
 #include <pipewire/pipewire.h>
 #include "PipeWireModule/PipeWireStream.hpp"
 #include "PortalModule/xdg-desktop-portal.hpp"

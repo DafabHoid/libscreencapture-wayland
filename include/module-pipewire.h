@@ -1,5 +1,5 @@
 /*******************************************************************************
-   Copyright © 2022 by DafabHoid <github@dafaboid.de>
+   Copyright © 2022-2023 by DafabHoid <github@dafaboid.de>
 
    SPDX-License-Identifier: GPL-3.0-or-later
 *******************************************************************************/
