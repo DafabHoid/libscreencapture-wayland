@@ -3,7 +3,6 @@
 
    SPDX-License-Identifier: GPL-3.0-or-later
 *******************************************************************************/
-#include <pipewire/pipewire.h>
 #include "PipeWireModule/PipeWireStream.hpp"
 #include "PortalModule/xdg-desktop-portal.hpp"
 #include "FFMPEGModule/FFmpegOutput.hpp"
@@ -107,6 +106,8 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
+	screencapture_wayland_init(&argc, &argv);
+
 	try
 	{
 		auto cursorMode = withCursor ? CURSOR_MODE_EMBED : CURSOR_MODE_HIDDEN;
@@ -118,7 +119,6 @@ int main(int argc, char** argv)
 		}
 
 		printf("SharedScreen fd = %d, node = %u\n", shareInfo.value().pipeWireFd, shareInfo.value().pipeWireNode);
-		pw_init(&argc, &argv);
 
 
 		{
@@ -190,7 +190,7 @@ int main(int argc, char** argv)
 			}
 		}
 
-		pw_deinit();
+		screencapture_wayland_deinit();
 		close(signalFd);
 		return 0;
 	}

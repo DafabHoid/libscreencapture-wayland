@@ -24,6 +24,16 @@ using namespace std::string_literals;
 namespace pw
 {
 
+void init(int* argc, char*** argv)
+{
+	pw_init(argc, argv);
+}
+
+void deinit()
+{
+	pw_deinit();
+}
+
 static constexpr inline uint32_t spa2drmFormat(spa_video_format format)
 {
 	switch (format)

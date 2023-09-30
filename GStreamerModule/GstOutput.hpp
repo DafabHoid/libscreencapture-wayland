@@ -16,6 +16,9 @@ namespace gstreamer
 using common::PixelFormat;
 using common::Rect;
 
+void init(int* argc, char*** argv);
+void deinit();
+
 enum class Codec
 {
 	H264,

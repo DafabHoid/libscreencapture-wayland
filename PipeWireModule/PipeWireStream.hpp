@@ -25,6 +25,9 @@ using common::MemoryFrame;
 using common::DmaBufFrame;
 using common::SharedScreen;
 
+void init(int* argc, char*** argv);
+void deinit();
+
 namespace event
 {
 

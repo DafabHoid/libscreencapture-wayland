@@ -38,7 +38,7 @@ add_library(screencapture-wayland-common INTERFACE
             include/module-pipewire.h)
 target_include_directories(screencapture-wayland-common INTERFACE include/)
 
-add_library(screencapture-wayland)
+add_library(screencapture-wayland common.cpp)
 # remove unused code and enable RelRO
 target_link_options(screencapture-wayland PRIVATE -Wl,-z,now -Wl,-gc-sections)
 target_link_libraries(screencapture-wayland PUBLIC screencapture-wayland-common)
@@ -52,23 +52,27 @@ endif ()
 if(ENABLE_PORTAL_MODULE)
     add_subdirectory(PortalModule)
     target_link_libraries(screencapture-wayland ${MODULE_SCOPE} screencapture-module-portal)
+    target_compile_definitions(screencapture-wayland PRIVATE "HAVE_PORTAL_MODLE")
 endif()
 
 
 if (ENABLE_PIPEWIRE_MODULE)
     add_subdirectory(PipeWireModule)
     target_link_libraries(screencapture-wayland ${MODULE_SCOPE} screencapture-module-pipewire)
+    target_compile_definitions(screencapture-wayland PRIVATE "HAVE_PIPEWIRE_MODLE")
 endif()
 
 
 if (ENABLE_FFMPEG_MODULE)
     add_subdirectory(FFMPEGModule)
     target_link_libraries(screencapture-wayland ${MODULE_SCOPE} screencapture-module-ffmpeg)
+    target_compile_definitions(screencapture-wayland PRIVATE "HAVE_FFMPEG_MODLE")
 endif()
 
 if (ENABLE_GSTREAMER_MODULE)
     add_subdirectory(GStreamerModule)
     target_link_libraries(screencapture-wayland ${MODULE_SCOPE} screencapture-module-gst)
+    target_compile_definitions(screencapture-wayland PRIVATE "HAVE_GSTREAMER_MODULE")
 endif()
 
 
@@ -77,16 +81,10 @@ endif()
 ######################################
 
 add_executable(screencapture main.cpp)
-target_link_libraries(screencapture PRIVATE screencapture-wayland screencapture-module-pipewire)
+target_link_libraries(screencapture PRIVATE screencapture-wayland)
 
 # enable Full RELRO
 target_link_options(screencapture PRIVATE -Wl,-z,now -Wl,-gc-sections -Wl,-as-needed)
 if(${STATIC_LIBSTDC++})
     target_link_options(screencapture PRIVATE -static-libstdc++)
-endif()
-
-if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
-    # clang needlessly vectorizes the string replace code, even though the string is quite small
-    # disable vectorize for this file to reduce code size
-    set_source_files_properties(xdg-desktop-portal.cpp PROPERTIES COMPILE_OPTIONS "-fno-vectorize")
 endif()

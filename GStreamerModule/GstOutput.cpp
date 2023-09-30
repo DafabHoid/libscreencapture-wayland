@@ -12,6 +12,16 @@ using namespace std::chrono_literals;
 namespace gstreamer
 {
 
+void init(int* argc, char*** argv)
+{
+	gst_init(argc, argv);
+}
+
+void deinit()
+{
+	gst_deinit();
+}
+
 static GstVideoFormat pixelFormat2Gst(PixelFormat format)
 {
 	switch (format)

@@ -14,6 +14,16 @@
 #define SCW_EXPORT __attribute__((visibility("default")))
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+SCW_EXPORT void screencapture_wayland_init(int* argc, char*** argv);
+SCW_EXPORT void screencapture_wayland_deinit();
+
+#ifdef __cplusplus
+}
+#endif
 
 typedef struct
 {
