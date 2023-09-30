@@ -14,6 +14,7 @@ option(ENABLE_PORTAL_MODULE "Enable the xdg-desktop-portal module" ON)
 option(ENABLE_PIPEWIRE_MODULE "Enable the PipeWire module" ON)
 option(ENABLE_FFMPEG_MODULE "Enable the FFmpeg encoder module" ON)
 option(ENABLE_GSTREAMER_MODULE "Enable the GStreamer encoder module" OFF)
+option(EXPORT_CPP_INTERFACE "Export the C++ interface in addition to the C interface" ON)
 option(BUILD_SHARED_LIBS "Build a shared library instead of a static one" OFF)
 option(BUILD_FFMPEG "Build own ffmpeg libraries instead of using system-provided ones" OFF)
 # use static C++ library by default to reduce possible ABI breakages at runtime
@@ -36,7 +37,10 @@ add_library(screencapture-wayland-common INTERFACE
             include/c_common.h
             include/module-portal.h
             include/module-pipewire.h)
-target_include_directories(screencapture-wayland-common INTERFACE include/)
+target_include_directories(screencapture-wayland-common INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include/)
+if (${EXPORT_CPP_INTERFACE})
+    target_include_directories(screencapture-wayland-common INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+endif ()
 
 add_library(screencapture-wayland common.cpp)
 # remove unused code and enable RelRO
@@ -44,7 +48,11 @@ target_link_options(screencapture-wayland PRIVATE -Wl,-z,now -Wl,-gc-sections)
 target_link_libraries(screencapture-wayland PUBLIC screencapture-wayland-common)
 
 if (${BUILD_SHARED_LIBS})
-    set(MODULE_SCOPE PRIVATE)
+    if (${EXPORT_CPP_INTERFACE})
+        set(MODULE_SCOPE PUBLIC)
+    else ()
+        set(MODULE_SCOPE PRIVATE)
+    endif ()
 else ()
     set(MODULE_SCOPE PUBLIC)
 endif ()

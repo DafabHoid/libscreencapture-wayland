@@ -3,9 +3,9 @@
 
    SPDX-License-Identifier: GPL-3.0-or-later
 *******************************************************************************/
-#include "PipeWireModule/PipeWireStream.hpp"
-#include "PortalModule/xdg-desktop-portal.hpp"
-#include "FFMPEGModule/FFmpegOutput.hpp"
+#include <PipeWireModule/PipeWireStream.hpp>
+#include <PortalModule/xdg-desktop-portal.hpp>
+#include <FFMPEGModule/FFmpegOutput.hpp>
 #include <cstdio>
 #include <unistd.h>
 #include <signal.h>
