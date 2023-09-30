@@ -30,31 +30,6 @@ endif ()
 # Dependencies
 ######################################
 
-find_package(Threads REQUIRED)
-find_package(PkgConfig REQUIRED)
-
-
-if (ENABLE_FFMPEG_MODULE)
-if (${BUILD_FFMPEG})
-    include(cmake/BuildFFmpeg.cmake)
-    set(FFMPEG_LIBS
-            libav::codec
-            libav::format
-            libav::filter
-            libav::util)
-else()
-    pkg_check_modules(libavutil REQUIRED IMPORTED_TARGET libavutil)
-    pkg_check_modules(libavcodec REQUIRED IMPORTED_TARGET libavcodec)
-    pkg_check_modules(libavformat REQUIRED IMPORTED_TARGET libavformat)
-    pkg_check_modules(libavfilter REQUIRED IMPORTED_TARGET libavfilter)
-    set(FFMPEG_LIBS
-            PkgConfig::libavcodec
-            PkgConfig::libavformat
-            PkgConfig::libavfilter
-            PkgConfig::libavutil)
-endif() # BUILD_FFMPEG
-endif() # ENABLE_FFMPEG_MODULE
-
 if (ENABLE_GSTREAMER_MODULE)
     pkg_check_modules(gstcore REQUIRED IMPORTED_TARGET gstreamer-base-1.0)
     pkg_check_modules(gstvideo REQUIRED IMPORTED_TARGET gstreamer-video-1.0)
@@ -89,25 +64,7 @@ endif()
 
 
 if (ENABLE_FFMPEG_MODULE)
-    add_library(screencapture-module-ffmpeg OBJECT
-            FFMPEGModule/libavcommon.hpp
-            FFMPEGModule/BlockingRingbuffer.hpp
-            FFMPEGModule/FFmpegOutput.cpp
-            FFMPEGModule/FFmpegOutput.hpp
-            FFMPEGModule/VAAPIEncoder.cpp
-            FFMPEGModule/VAAPIEncoder.hpp
-            FFMPEGModule/VAAPIScaler.cpp
-            FFMPEGModule/VAAPIScaler.hpp
-            FFMPEGModule/Muxer.cpp
-            FFMPEGModule/Muxer.hpp
-            FFMPEGModule/ThreadedWrapper.inc
-            FFMPEGModule/ThreadedWrapper.hpp)
-    target_link_libraries(screencapture-module-ffmpeg PUBLIC ${FFMPEG_LIBS} Threads::Threads)
-    set_property(TARGET screencapture-module-ffmpeg PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
-    if(${BUILD_FFMPEG})
-        add_dependencies(screencapture-module-ffmpeg ffmpeg)
-    endif()
-
+    add_subdirectory(FFMPEGModule)
     target_link_libraries(screencapture-wayland PUBLIC screencapture-module-ffmpeg)
 endif()
 
