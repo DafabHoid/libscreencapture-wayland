@@ -7,6 +7,8 @@
 #define SCREENCAPTURE_C_COMMON_H
 
 #include <stdint.h>
+#include <stddef.h> // size_t
+#include <stdlib.h> // free()
 
 #ifndef SCW_EXPORT
 #define SCW_EXPORT __attribute__((visibility("default")))
@@ -40,7 +42,7 @@ struct MemoryFrame
 {
 	uint32_t width;
 	uint32_t height;
-	PixelFormat format;
+	enum PixelFormat format;
 	void* memory;
 	size_t stride;
 	size_t size;
