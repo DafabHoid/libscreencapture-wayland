@@ -43,27 +43,32 @@ add_library(screencapture-wayland)
 target_link_options(screencapture-wayland PRIVATE -Wl,-z,now -Wl,-gc-sections)
 target_link_libraries(screencapture-wayland PUBLIC screencapture-wayland-common)
 
+if (${BUILD_SHARED_LIBS})
+    set(MODULE_SCOPE PRIVATE)
+else ()
+    set(MODULE_SCOPE PUBLIC)
+endif ()
 
 if(ENABLE_PORTAL_MODULE)
     add_subdirectory(PortalModule)
-    target_link_libraries(screencapture-wayland PUBLIC screencapture-module-portal)
+    target_link_libraries(screencapture-wayland ${MODULE_SCOPE} screencapture-module-portal)
 endif()
 
 
 if (ENABLE_PIPEWIRE_MODULE)
     add_subdirectory(PipeWireModule)
-    target_link_libraries(screencapture-wayland PUBLIC screencapture-module-pipewire)
+    target_link_libraries(screencapture-wayland ${MODULE_SCOPE} screencapture-module-pipewire)
 endif()
 
 
 if (ENABLE_FFMPEG_MODULE)
     add_subdirectory(FFMPEGModule)
-    target_link_libraries(screencapture-wayland PUBLIC screencapture-module-ffmpeg)
+    target_link_libraries(screencapture-wayland ${MODULE_SCOPE} screencapture-module-ffmpeg)
 endif()
 
 if (ENABLE_GSTREAMER_MODULE)
     add_subdirectory(GStreamerModule)
-    target_link_libraries(screencapture-wayland PUBLIC screencapture-module-gst)
+    target_link_libraries(screencapture-wayland ${MODULE_SCOPE} screencapture-module-gst)
 endif()
 
 
@@ -72,7 +77,7 @@ endif()
 ######################################
 
 add_executable(screencapture main.cpp)
-target_link_libraries(screencapture PRIVATE screencapture-wayland)
+target_link_libraries(screencapture PRIVATE screencapture-wayland screencapture-module-pipewire)
 
 # enable Full RELRO
 target_link_options(screencapture PRIVATE -Wl,-z,now -Wl,-gc-sections -Wl,-as-needed)

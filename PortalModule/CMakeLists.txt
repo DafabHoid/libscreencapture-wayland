@@ -19,11 +19,5 @@ add_library(screencapture-module-portal OBJECT
             xdg-desktop-portal.cpp
             xdg-desktop-portal.hpp)
 target_link_libraries(screencapture-module-portal PRIVATE screencapture-wayland-common)
-if(BUILD_SHARED_LIBS)
-    target_link_libraries(screencapture-module-portal PRIVATE sdbus-c++)
-else()
-    # for a static library, propagate this dependency to anyone linking against us, because
-    # linking a static library (this) against another one (sdbus-c++) does not do anything
-    target_link_libraries(screencapture-module-portal PUBLIC sdbus-c++)
-endif()
+target_link_libraries(screencapture-module-portal ${MODULE_SCOPE} sdbus-c++)
 set_property(TARGET screencapture-module-portal PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
