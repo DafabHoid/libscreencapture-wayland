@@ -115,7 +115,7 @@ For the GStreamer module:
 - `gstreamer-video` – For video formats
 - `gstreamer-vaapi` – For hardware accelerated video encoding
 
-### Steps
+### Steps to build the example `screencapture` binary
 Building is done like a typical CMake project:
 
     $ mkdir build && cd build
@@ -127,6 +127,27 @@ Some options you can pass vida `-D<option>=<value>` to cmake:
    - `ENABLE_PIPEWIRE_MODULE` Set to OFF to disable the pipewire module build (default ON)
    - `ENABLE_FFMPEG_MODULE` Set to OFF to disable the ffmpeg module build (default ON)
    - `ENABLE_GSTREAMER_MODULE` Set to ON to enable the gstreamer module build (default OFF)
+   - `EXPORT_CPP_INTERFACE` Set to OFF to disable exporting the C++ header files to users of the library and only export the C headers (default ON).
+      Because the C++ headers of each module pull in the headers from their dependencies, disabling this option can reduce the amount of include paths.  
    - `BUILD_SHARED_LIBS` Set to ON to build a shared library (default OFF)
    - `BUILD_FFMPEG` Set to ON to build a local minimal ffmpeg distribution for the ffmpeg module.
-Otherwise the system-provided ones are used. (default OFF)
+      Otherwise the system-provided ones are used. (default OFF)
+
+### Using this library inside another CMake project
+To use this library as a dependency inside another CMake project, place it inside your existing source directory.
+
+    $ git checkout https://github.com/DafabHoid/libscreencapture-wayland.git
+
+Then, in your `CMakeLists.txt` file, add it as a subdirectory, while setting any options beforehand:
+
+    set(BUILD_SHARED_LIBS ON)
+    set(ENABLE_PORTAL_MODULE ON)
+    set(ENABLE_PIPEWIRE_MODULE ON)
+    set(ENABLE_FFMPEG_MODULE OFF)
+    set(ENABLE_GSTREAMER_MODULE OFF)
+    set(EXPORT_CPP_INTERFACE OFF)
+    add_subdirectory(libscreencapture-wayland)
+    
+    target_link_libraries(<target> PRIVATE screencapture-wayland)
+
+For available options see the section above.
