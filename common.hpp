@@ -108,7 +108,32 @@ struct MemoryFrame
 
 
 #ifndef NDEBUG
-SCW_EXPORT extern void dumpStackTrace(const char* filename = "trace.txt") noexcept;
+#include <execinfo.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdio.h>
+/** Dump a stack trace to the file at @param filename.
+ * This function does not use the heap, and only opens a file descriptor for the output file. */
+inline void dumpStackTrace(const char* filename = "trace.txt") noexcept
+{
+	void* bt[50];
+	int num = backtrace(bt, sizeof(bt)/sizeof(bt[0]));
+	// write the stack trace if it was successful and includes more than this function's frame
+	if (num > 1)
+	{
+		int fd = open(filename, O_WRONLY|O_TRUNC|O_CREAT|O_CLOEXEC, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH);
+		if (fd < 0)
+			perror("Opening trace file failed");
+		else
+		{
+			const char* msg = "Trace for Exception:\n";
+			write(fd, msg, sizeof(msg)-1);
+			// write the stack trace, starting from the frame of our calling function
+			backtrace_symbols_fd(bt + 1, num - 1, fd);
+			close(fd);
+		}
+	}
+}
 #endif
 
 
