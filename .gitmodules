@@ -1,5 +1,5 @@
 [submodule "sdbus-cpp"]
-	path = sdbus-cpp
+	path = PortalModule/sdbus-cpp
 	url = https://github.com/Kistler-Group/sdbus-cpp.git
 [submodule "ffmpeg"]
 	path = ffmpeg

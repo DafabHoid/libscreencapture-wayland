@@ -1,5 +1,5 @@
 ################################################################################
-# Copyright © 2022 by DafabHoid <github@dafaboid.de>
+# Copyright © 2022-2023 by DafabHoid <github@dafaboid.de>
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 ################################################################################
@@ -33,19 +33,6 @@ endif ()
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 
-if(ENABLE_PORTAL_MODULE)
-    function(ImportSDBusCpp)
-        # always build this statically, even when otherwise building shared libraries
-        # this is needed because sdbus-c++ does not work well with VISIBILITY_PRESET "hidden"
-        set(BUILD_SHARED_LIBS OFF)
-        add_subdirectory(sdbus-cpp)
-    endfunction()
-    # use function to create a new scope for variables
-    ImportSDBusCpp()
-    # set the PIC flag correctly (is always off otherwise, because it is a static library)
-    # but we include it in our library, so it must match in position independence
-    set_target_properties(sdbus-c++-objlib PROPERTIES POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
-endif()
 
 if(ENABLE_PIPEWIRE_MODULE)
     pkg_check_modules(pipewire REQUIRED IMPORTED_TARGET libpipewire-0.3)
@@ -94,20 +81,7 @@ target_link_options(screencapture-wayland PRIVATE -Wl,-z,now -Wl,-gc-sections)
 
 
 if(ENABLE_PORTAL_MODULE)
-    add_library(screencapture-module-portal OBJECT common.hpp include/c_common.h
-            PortalModule/xdg-desktop-portal.cpp
-            PortalModule/xdg-desktop-portal.hpp
-            include/module-portal.h)
-    target_include_directories(screencapture-module-portal PUBLIC include/)
-    if(BUILD_SHARED_LIBS)
-        target_link_libraries(screencapture-module-portal PRIVATE sdbus-c++)
-    else()
-        # for a static library, propagate this dependency to anyone linking against us, because
-        # linking a static library (this) against another one (sdbus-c++) does not do anything
-        target_link_libraries(screencapture-module-portal PUBLIC sdbus-c++)
-    endif()
-    set_property(TARGET screencapture-module-portal PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
-
+    add_subdirectory(PortalModule)
     target_link_libraries(screencapture-wayland PUBLIC screencapture-module-portal)
 endif()
 
