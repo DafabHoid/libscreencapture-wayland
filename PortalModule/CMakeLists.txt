@@ -15,11 +15,10 @@ ImportSDBusCpp()
 # but we include it in our library, so it must match in position independence
 set_target_properties(sdbus-c++-objlib PROPERTIES POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
 
-add_library(screencapture-module-portal OBJECT ../common.hpp ../include/c_common.h
+add_library(screencapture-module-portal OBJECT
             xdg-desktop-portal.cpp
-            xdg-desktop-portal.hpp
-            ../include/module-portal.h)
-target_include_directories(screencapture-module-portal PUBLIC ../include/)
+            xdg-desktop-portal.hpp)
+target_link_libraries(screencapture-module-portal PRIVATE screencapture-wayland-common)
 if(BUILD_SHARED_LIBS)
     target_link_libraries(screencapture-module-portal PRIVATE sdbus-c++)
 else()

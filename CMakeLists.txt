@@ -31,9 +31,17 @@ endif ()
 # Module definitions
 ######################################
 
-add_library(screencapture-wayland common.hpp include/c_common.h)
+add_library(screencapture-wayland-common INTERFACE
+            common.hpp
+            include/c_common.h
+            include/module-portal.h
+            include/module-pipewire.h)
+target_include_directories(screencapture-wayland-common INTERFACE include/)
+
+add_library(screencapture-wayland)
 # remove unused code and enable RelRO
 target_link_options(screencapture-wayland PRIVATE -Wl,-z,now -Wl,-gc-sections)
+target_link_libraries(screencapture-wayland PUBLIC screencapture-wayland-common)
 
 
 if(ENABLE_PORTAL_MODULE)

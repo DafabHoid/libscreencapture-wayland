@@ -14,8 +14,9 @@ set(GSTREAMER_LIBS
         PkgConfig::gstapp
         PkgConfig::gstvideo)
 
-add_library(screencapture-module-gst OBJECT ../common.hpp
+add_library(screencapture-module-gst OBJECT
         GstOutput.cpp
         GstOutput.hpp)
+target_link_libraries(screencapture-module-gst PRIVATE screencapture-wayland-common)
 target_link_libraries(screencapture-module-gst PUBLIC ${GSTREAMER_LIBS} Threads::Threads)
 set_property(TARGET screencapture-module-gst PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
